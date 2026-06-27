@@ -54,7 +54,7 @@ export default async function InventoryPage({
           <select
             name="location"
             defaultValue={location ?? ""}
-            className="border border-line bg-white px-3 py-2 text-sm text-ink"
+            className="border border-line bg-surface px-3 py-2 text-sm text-bone"
           >
             <option value="">All locations</option>
             {(locations ?? []).map((loc) => (

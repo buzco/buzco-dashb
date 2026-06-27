@@ -7,7 +7,7 @@ export function Label(props: LabelHTMLAttributes<HTMLLabelElement>) {
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full border border-line bg-white px-3 py-2 text-ink outline-none focus:border-ink ${className}`}
+      className={`w-full border border-line bg-surface px-3 py-2 text-bone outline-none placeholder:text-ink/30 focus:border-ink ${className}`}
       {...props}
     />
   );

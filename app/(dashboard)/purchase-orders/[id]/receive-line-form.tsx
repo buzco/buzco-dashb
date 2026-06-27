@@ -33,12 +33,12 @@ export function ReceiveLineForm({
         max={remaining}
         defaultValue={remaining}
         required
-        className="w-20 border border-line bg-white px-2 py-1 text-sm text-ink outline-none focus:border-ink"
+        className="w-20 border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
       />
       <select
         name="location_id"
         defaultValue={defaultLocationId}
-        className="border border-line bg-white px-2 py-1 text-sm text-ink outline-none focus:border-ink"
+        className="border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
       >
         {locations.map((l) => (
           <option key={l.id} value={l.id}>

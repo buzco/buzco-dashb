@@ -2,9 +2,11 @@ import { type ButtonHTMLAttributes } from "react";
 
 type Variant = "primary" | "secondary";
 
+// Storefront buttons: sharp 0px corners, no rounding. Primary is hot-pink
+// (#E0207B) with black text; secondary is an outlined green ghost button.
 const VARIANT_STYLES: Record<Variant, string> = {
-  primary: "bg-ink text-paper hover:bg-ink/90",
-  secondary: "border border-line text-ink hover:border-ink",
+  primary: "bg-pink text-black hover:opacity-90",
+  secondary: "border border-ink/60 text-ink hover:border-ink hover:bg-ink/10",
 };
 
 export function Button({

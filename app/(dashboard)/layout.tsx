@@ -18,7 +18,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex min-h-screen bg-paper">
       <aside className="flex w-56 flex-col justify-between border-r border-line p-6">
         <div>
-          <p className="label-caps mb-8 text-ink">Buzco Ops</p>
+          <div className="mb-8">
+            <p className="text-2xl font-bold leading-none text-ink">Buzco</p>
+            <p className="label-caps mt-1 text-ink/50">Ops</p>
+          </div>
           <nav className="space-y-3">
             {NAV.map((item) => (
               <Link

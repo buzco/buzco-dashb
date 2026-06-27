@@ -1,41 +1,62 @@
 @import "tailwindcss";
 
-/* Buzco brand: off-white/near-black, no dark-mode flip — the storefront
-   doesn't have one and this tool should look the same regardless of the
-   viewer's OS setting. */
+/* Buzco brand — pulled from gr8success.xyz (color-scheme-1, the storefront's
+   primary scheme): black page, vivid green (#00C389) Times New Roman text,
+   hot-pink (#E0207B) buttons, sharp 0px corners, pill-shaped badges. No
+   dark-mode flip — the storefront is always this, regardless of OS setting. */
 :root {
-  --ink: #0a0a0a;
-  --paper: #fafaf7;
-  --line: #e5e2da;
+  --paper: #000000;        /* page background (was off-white; now brand black) */
+  --surface: #0c0c0c;      /* raised panels: cards, inputs, table zebra */
+  --ink: #00c389;          /* primary foreground — brand green */
+  --bone: #f3f3f3;         /* high-contrast text for key figures/numbers */
+  --line: #1d3b30;         /* hairline: dim green on black */
+  --pink: #e0207b;         /* primary action */
+  --blue: #334fb4;         /* secondary accent */
 }
 
 @theme inline {
-  --color-ink: var(--ink);
   --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-bone: var(--bone);
   --color-line: var(--line);
+  --color-pink: var(--pink);
+  --color-blue: var(--blue);
 
-  /* status/badge chips — translates the storefront's "NEW"/"LAST UNITS"
-     badge treatment into po_status / consignment status colors */
-  --color-status-draft: #d4d4d4;
+  /* status/badge chips — the storefront's pill badge treatment, mapped to
+     po_status / consignment / retailer status. Rendered as outlined pills. */
+  --color-status-draft: #9ca3af;
   --color-status-ordered: #fde047;
   --color-status-partially_received: #fb923c;
-  --color-status-received: #86efac;
-  --color-status-cancelled: #fca5a5;
-  --color-status-active: #86efac;
-  --color-status-settled: #bfdbfe;
-  --color-status-returned: #d4d4d4;
-  --color-status-prospect: #d4d4d4;
+  --color-status-received: #00c389;
+  --color-status-cancelled: #e0207b;
+  --color-status-active: #00c389;
+  --color-status-settled: #334fb4;
+  --color-status-returned: #9ca3af;
+  --color-status-prospect: #9ca3af;
 
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
+  /* Times New Roman is the storefront's heading AND body face — and it's a
+     system font, so this matches with zero web-font load. */
+  --font-sans: "Times New Roman", Times, serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
 
 body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-size: 1.05rem; /* storefront uses a 1.1 body scale; serif reads small */
+}
+
+::selection {
+  background: var(--pink);
+  color: #000;
+}
+
+h1, h2, h3 {
+  font-weight: 700;
 }
 
 .label-caps {
-  @apply uppercase tracking-wider text-xs font-medium;
+  @apply uppercase tracking-wider text-xs font-normal;
 }
