@@ -9,7 +9,7 @@ export default function LoginPage() {
   return (
     <form
       action={formAction}
-      className="w-full max-w-sm space-y-6 border border-line bg-surface p-8"
+      className="w-full max-w-sm space-y-6 rounded-xl border border-line bg-surface p-8"
     >
       <div className="space-y-1">
         <p className="label-caps text-ink/60">Buzco</p>
@@ -27,7 +27,7 @@ export default function LoginPage() {
             type="email"
             required
             autoComplete="email"
-            className="w-full border border-line bg-surface px-3 py-2 text-bone outline-none focus:border-ink"
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-bone outline-none focus:border-ink"
           />
         </div>
 
@@ -41,7 +41,7 @@ export default function LoginPage() {
             type="password"
             required
             autoComplete="current-password"
-            className="w-full border border-line bg-surface px-3 py-2 text-bone outline-none focus:border-ink"
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-bone outline-none focus:border-ink"
           />
         </div>
       </div>
@@ -51,7 +51,7 @@ export default function LoginPage() {
       <button
         type="submit"
         disabled={isPending}
-        className="label-caps w-full bg-pink py-2 text-black hover:opacity-90 disabled:opacity-50"
+        className="label-caps w-full rounded-md bg-pink py-2 text-black hover:opacity-90 disabled:opacity-50"
       >
         {isPending ? "Signing in…" : "Sign in"}
       </button>

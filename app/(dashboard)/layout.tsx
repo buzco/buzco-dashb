@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV = [
   { href: "/", label: "Overview" },
@@ -23,8 +24,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="flex w-56 flex-col justify-between border-r border-line bg-black/50 p-6 backdrop-blur-sm">
+    <div className="flex min-h-screen flex-1 bg-paper text-ink">
+      <aside className="flex w-56 flex-col justify-between border-r border-line bg-surface/80 p-6 backdrop-blur-sm">
         <div>
           <div className="mb-8">
             <Image
@@ -38,12 +39,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             />
             <p className="label-caps mt-1 text-center text-ink/50">Ops</p>
           </div>
-          <nav className="space-y-3">
+          <nav className="space-y-0.5">
             {NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="label-caps block text-ink/70 hover:text-ink"
+                className="label-caps block rounded-md px-2 py-1.5 text-ink/70 transition-colors hover:bg-ink/10 hover:text-ink"
               >
                 {item.label}
               </Link>
@@ -51,6 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </nav>
         </div>
         <div className="space-y-3">
+          <ThemeToggle />
           <p className="truncate text-xs text-ink/50">{user?.email}</p>
           <form action={signOut}>
             <button type="submit" className="label-caps text-ink/70 hover:text-ink">

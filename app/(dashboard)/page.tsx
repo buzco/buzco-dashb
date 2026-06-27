@@ -14,11 +14,11 @@ export default async function OverviewPage() {
     <div className="space-y-8">
       <h1 className="label-caps text-ink/60">Overview</h1>
       <div className="flex gap-8">
-        <div className="border border-line bg-surface p-6">
+        <div className="rounded-lg border border-line bg-surface p-6">
           <p className="label-caps text-ink/60">Products</p>
           <p className="mt-2 text-4xl font-bold text-bone">{productCount ?? 0}</p>
         </div>
-        <div className="border border-line bg-surface p-6">
+        <div className="rounded-lg border border-line bg-surface p-6">
           <p className="label-caps text-ink/60">Units in stock</p>
           <p className="mt-2 text-4xl font-bold tabular-nums text-bone">{totalUnits}</p>
         </div>

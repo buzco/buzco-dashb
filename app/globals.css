@@ -1,17 +1,28 @@
 @import "tailwindcss";
 
-/* Buzco brand — pulled from gr8success.xyz (color-scheme-1, the storefront's
-   primary scheme): black page, vivid green (#00C389) Times New Roman text,
-   hot-pink (#E0207B) buttons, sharp 0px corners, pill-shaped badges. No
-   dark-mode flip — the storefront is always this, regardless of OS setting. */
+/* Buzco brand — gr8success.xyz. Default is the storefront's primary scheme:
+   black page, vivid green (#00C389) Times New Roman text, hot-pink (#E0207B)
+   actions. A light mode (opt-in via [data-theme="light"]) mirrors the
+   storefront's light scheme: off-white page, near-black text, same pink/green
+   accents. Default stays dark. */
 :root {
-  --paper: #000000;        /* page background (was off-white; now brand black) */
-  --surface: #0c0c0c;      /* raised panels: cards, inputs, table zebra */
-  --ink: #00c389;          /* primary foreground — brand green */
-  --bone: #f3f3f3;         /* high-contrast text for key figures/numbers */
-  --line: #1d3b30;         /* hairline: dim green on black */
-  --pink: #e0207b;         /* primary action */
-  --blue: #334fb4;         /* secondary accent */
+  --paper: #000000;
+  --surface: #0c0c0c;
+  --ink: #00c389;
+  --bone: #f3f3f3;
+  --line: #1d3b30;
+  --pink: #e0207b;
+  --blue: #334fb4;
+}
+
+:root[data-theme="light"] {
+  --paper: #f4f4f1;
+  --surface: #ffffff;
+  --ink: #16221d;   /* near-black with a faint green warmth */
+  --bone: #0a0a0a;
+  --line: #e2e2da;
+  --pink: #e0207b;
+  --blue: #334fb4;
 }
 
 @theme inline {
@@ -23,40 +34,35 @@
   --color-pink: var(--pink);
   --color-blue: var(--blue);
 
-  /* status/badge chips — the storefront's pill badge treatment, mapped to
-     po_status / consignment / retailer status. Rendered as outlined pills. */
+  /* status/badge chips, rendered as outlined pills */
   --color-status-draft: #9ca3af;
-  --color-status-ordered: #fde047;
-  --color-status-partially_received: #fb923c;
-  --color-status-received: #00c389;
+  --color-status-ordered: #d9a400;
+  --color-status-partially_received: #e8770f;
+  --color-status-received: #00b27d;
   --color-status-cancelled: #e0207b;
-  --color-status-active: #00c389;
+  --color-status-active: #00b27d;
   --color-status-settled: #334fb4;
   --color-status-returned: #9ca3af;
   --color-status-prospect: #9ca3af;
 
-  /* Times New Roman is the storefront's heading AND body face — and it's a
-     system font, so this matches with zero web-font load. */
   --font-sans: "Times New Roman", Times, serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+
+  /* shared corner radius — small, for the friendlier app-like feel */
+  --radius: 0.5rem;
 }
 
 body {
-  /* Tiled starfield behind everything (the "buzco sky" gif), pinned so it
-     stays put while content scrolls. Falls back to solid black if the file
-     isn't present yet. Drop the file at public/buzco-sky.gif. */
-  background-color: var(--paper);
-  background-image: url("/buzco-sky.gif");
-  background-repeat: repeat;
-  background-attachment: fixed;
-  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 1.05rem; /* storefront uses a 1.1 body scale; serif reads small */
+  font-size: 1.05rem;
 }
+
+/* Page bg/text come from bg-paper/text-ink utilities on the layout wrapper
+   divs — they reference the live theme vars and switch with data-theme. */
 
 ::selection {
   background: var(--pink);
-  color: #000;
+  color: #fff;
 }
 
 h1, h2, h3 {

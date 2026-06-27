@@ -37,7 +37,7 @@ export default async function ShopifyPage() {
       </h1>
 
       {/* Connection status */}
-      <div className="border border-line bg-surface p-6">
+      <div className="rounded-lg border border-line bg-surface p-6">
         {shop ? (
           <div className="space-y-3">
             <p className="text-bone">

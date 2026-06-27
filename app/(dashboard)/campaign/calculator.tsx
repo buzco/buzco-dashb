@@ -97,7 +97,7 @@ export function CampaignCalculator({ variants }: { variants: CalcVariant[] }) {
 
       {/* Live results */}
       <div className="space-y-4">
-        <div className={`border p-6 ${positive ? "border-status-received" : "border-status-cancelled"}`}>
+        <div className={`rounded-lg border p-6 ${positive ? "border-status-received" : "border-status-cancelled"}`}>
           <p className="label-caps text-ink/60">Ad budget — break-even</p>
           <p className="mt-1 text-4xl font-bold tabular-nums text-bone">{eur(r.maxAdSpend)}</p>
           <p className="mt-1 text-sm text-ink/60">
@@ -105,7 +105,7 @@ export function CampaignCalculator({ variants }: { variants: CalcVariant[] }) {
           </p>
         </div>
 
-        <div className="border border-line bg-surface p-6">
+        <div className="rounded-lg border border-line bg-surface p-6">
           <p className="label-caps text-ink/60">Ad budget — keep {eur(num(targetProfit))} profit</p>
           <p className="mt-1 text-3xl font-bold tabular-nums text-ink">{eur(r.adBudgetForTarget)}</p>
         </div>

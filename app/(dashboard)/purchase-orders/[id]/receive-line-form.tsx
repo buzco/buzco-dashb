@@ -33,12 +33,12 @@ export function ReceiveLineForm({
         max={remaining}
         defaultValue={remaining}
         required
-        className="w-20 border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
+        className="w-20 rounded-md border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
       />
       <select
         name="location_id"
         defaultValue={defaultLocationId}
-        className="border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
+        className="rounded-md border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
       >
         {locations.map((l) => (
           <option key={l.id} value={l.id}>
@@ -49,7 +49,7 @@ export function ReceiveLineForm({
       <button
         type="submit"
         disabled={isPending}
-        className="label-caps border border-line px-3 py-1 text-ink hover:border-ink disabled:opacity-50"
+        className="label-caps rounded-md border border-line px-3 py-1 text-ink hover:border-ink disabled:opacity-50"
       >
         {isPending ? "…" : "Receive"}
       </button>

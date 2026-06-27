@@ -54,7 +54,7 @@ export default async function InventoryPage({
           <select
             name="location"
             defaultValue={location ?? ""}
-            className="border border-line bg-surface px-3 py-2 text-sm text-bone"
+            className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-bone"
           >
             <option value="">All locations</option>
             {(locations ?? []).map((loc) => (
@@ -63,7 +63,7 @@ export default async function InventoryPage({
               </option>
             ))}
           </select>
-          <button type="submit" className="label-caps border border-line px-4 py-2 text-ink hover:border-ink">
+          <button type="submit" className="label-caps rounded-md border border-line px-4 py-2 text-ink hover:border-ink">
             Filter
           </button>
         </form>

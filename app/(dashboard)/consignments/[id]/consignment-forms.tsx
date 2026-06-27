@@ -111,12 +111,12 @@ export function LineQuantityAction({
         max={max}
         defaultValue={1}
         required
-        className="w-16 border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
+        className="w-16 rounded-md border border-line bg-surface px-2 py-1 text-sm text-bone outline-none focus:border-ink"
       />
       <button
         type="submit"
         disabled={isPending}
-        className="label-caps border border-ink/60 px-2 py-1 text-ink hover:border-ink disabled:opacity-50"
+        className="label-caps rounded-md border border-ink/60 px-2 py-1 text-ink hover:border-ink disabled:opacity-50"
       >
         {isPending ? "…" : verb}
       </button>

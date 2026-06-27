@@ -32,7 +32,7 @@ export function Badge({ status }: { status: string }) {
 
   return (
     <span
-      className={`label-caps inline-block rounded-full border bg-black px-2.5 py-0.5 ${border} ${text}`}
+      className={`label-caps inline-block rounded-full border bg-transparent px-2.5 py-0.5 ${border} ${text}`}
     >
       {status.replace(/_/g, " ")}
     </span>

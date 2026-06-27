@@ -6,7 +6,7 @@ const eur = (n: number) =>
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="border border-line bg-surface p-5">
+    <div className="rounded-lg border border-line bg-surface p-5">
       <p className="label-caps text-ink/60">{label}</p>
       <p className={`mt-2 text-3xl font-bold tabular-nums ${accent ? "text-ink" : "text-bone"}`}>{value}</p>
     </div>
