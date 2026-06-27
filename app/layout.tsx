@@ -1,5 +1,18 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
+
+// Google Sans Flex (self-hosted, optimized by next/font) — the brand's UI face.
+const googleSans = localFont({
+  src: [
+    { path: "./fonts/GoogleSansFlex_120pt-Light.ttf", weight: "300", style: "normal" },
+    { path: "./fonts/GoogleSansFlex_120pt-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/GoogleSansFlex_120pt-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/GoogleSansFlex_120pt-SemiBold.ttf", weight: "600", style: "normal" },
+  ],
+  variable: "--font-google-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Buzco Ops",
@@ -12,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`${googleSans.variable} h-full antialiased`}>
       <head>
         <script
           // Apply saved theme before paint to avoid a flash. Default is dark

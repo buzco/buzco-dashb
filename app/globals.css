@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Buzco brand — gr8success.xyz. Default is the storefront's primary scheme:
-   black page, vivid green (#00C389) Times New Roman text, hot-pink (#E0207B)
+   black page, vivid green (#00C389) text (Google Sans Flex), hot-pink (#E0207B)
    actions. A light mode (opt-in via [data-theme="light"]) mirrors the
    storefront's light scheme: off-white page, near-black text, same pink/green
    accents. Default stays dark. */
@@ -45,7 +45,7 @@
   --color-status-returned: #9ca3af;
   --color-status-prospect: #9ca3af;
 
-  --font-sans: "Times New Roman", Times, serif;
+  --font-sans: var(--font-google-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 
   /* shared corner radius — small, for the friendlier app-like feel */
