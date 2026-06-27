@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, Th, Td } from "@/components/ui/table";
 import { Label, Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ShopifyMark } from "@/components/ui/shopify-mark";
 
 export default async function ProductDetailPage({
   params,
@@ -27,7 +28,10 @@ export default async function ProductDetailPage({
     <div className="space-y-10">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">{product.name}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold text-ink">
+            {product.name}
+            {product.shopify_product_id && <ShopifyMark />}
+          </h1>
           {product.description && (
             <p className="mt-1 text-sm text-ink/60">{product.description}</p>
           )}
@@ -53,7 +57,12 @@ export default async function ProductDetailPage({
             <tbody>
               {variants.map((variant) => (
                 <tr key={variant.id}>
-                  <Td className="font-mono">{variant.sku}</Td>
+                  <Td className="font-mono">
+                    <span className="inline-flex items-center gap-1.5">
+                      {variant.sku}
+                      {variant.shopify_variant_id && <ShopifyMark />}
+                    </span>
+                  </Td>
                   <Td>{variant.size ?? "—"}</Td>
                   <Td>{variant.color ?? "—"}</Td>
                   <Td className="text-right font-mono tabular-nums">

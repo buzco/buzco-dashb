@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ShopifyMark } from "@/components/ui/shopify-mark";
 
 export default async function ProductsPage() {
   const supabase = await createClient();
@@ -34,7 +35,10 @@ export default async function ProductsPage() {
             <Link key={product.id} href={`/products/${product.id}`}>
               <Card className="h-full p-4 hover:border-ink">
                 <div className="mb-3 flex items-start justify-between gap-2">
-                  <h2 className="font-medium text-ink">{product.name}</h2>
+                  <h2 className="flex items-center gap-1.5 font-medium text-ink">
+                    {product.name}
+                    {product.shopify_product_id && <ShopifyMark />}
+                  </h2>
                   <Badge status={product.status} />
                 </div>
                 <p className="text-xs text-ink/50">

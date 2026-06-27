@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 
@@ -11,6 +12,7 @@ const NAV = [
   { href: "/consignments", label: "Consignments" },
   { href: "/suppliers", label: "Suppliers" },
   { href: "/retailers", label: "Retailers" },
+  { href: "/shopify", label: "Shopify" },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -18,12 +20,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <div className="flex min-h-screen bg-paper">
-      <aside className="flex w-56 flex-col justify-between border-r border-line p-6">
+    <div className="flex min-h-screen">
+      <aside className="flex w-56 flex-col justify-between border-r border-line bg-black/50 p-6 backdrop-blur-sm">
         <div>
           <div className="mb-8">
-            <p className="text-2xl font-bold leading-none text-ink">Buzco</p>
-            <p className="label-caps mt-1 text-ink/50">Ops</p>
+            <Image
+              src="/buzco-logo.gif"
+              alt="Buzco"
+              width={176}
+              height={99}
+              priority
+              unoptimized
+              className="h-auto w-full"
+            />
+            <p className="label-caps mt-1 text-center text-ink/50">Ops</p>
           </div>
           <nav className="space-y-3">
             {NAV.map((item) => (

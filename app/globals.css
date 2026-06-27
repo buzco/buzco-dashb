@@ -42,7 +42,13 @@
 }
 
 body {
-  background: var(--paper);
+  /* Tiled starfield behind everything (the "buzco sky" gif), pinned so it
+     stays put while content scrolls. Falls back to solid black if the file
+     isn't present yet. Drop the file at public/buzco-sky.gif. */
+  background-color: var(--paper);
+  background-image: url("/buzco-sky.gif");
+  background-repeat: repeat;
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 1.05rem; /* storefront uses a 1.1 body scale; serif reads small */
