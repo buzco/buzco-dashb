@@ -30,6 +30,7 @@ type ShopifyVariant = {
   price: string | null;
   inventoryQuantity: number | null;
   inventoryItem: { unitCost: { amount: string } | null } | null;
+  image: { url: string } | null;
   selectedOptions: Array<{ name: string; value: string }>;
 };
 
@@ -39,6 +40,7 @@ type ShopifyProduct = {
   descriptionHtml: string | null;
   status: "ACTIVE" | "ARCHIVED" | "DRAFT";
   tags: string[];
+  featuredImage: { url: string } | null;
   variants: { edges: Array<{ node: ShopifyVariant }> };
 };
 
@@ -52,6 +54,7 @@ const PRODUCTS_QUERY = `
           descriptionHtml
           status
           tags
+          featuredImage { url }
           variants(first: 100) {
             edges {
               node {
@@ -61,6 +64,7 @@ const PRODUCTS_QUERY = `
                 price
                 inventoryQuantity
                 inventoryItem { unitCost { amount } }
+                image { url }
                 selectedOptions { name value }
               }
             }
@@ -171,6 +175,7 @@ export async function syncFromShopify(): Promise<SyncResult> {
           status: mapStatus(p.status),
           tags: p.tags.length ? p.tags : null,
           shopify_product_id: p.id,
+          image_url: p.featuredImage?.url ?? null,
         };
 
         let productId: string;
@@ -206,6 +211,7 @@ export async function syncFromShopify(): Promise<SyncResult> {
             sku: string;
             retail_price: number | null;
             shopify_variant_id: string;
+            image_url: string | null;
             production_cost?: number;
           } = {
             product_id: productId,
@@ -214,6 +220,7 @@ export async function syncFromShopify(): Promise<SyncResult> {
             sku,
             retail_price,
             shopify_variant_id: v.id,
+            image_url: v.image?.url ?? p.featuredImage?.url ?? null,
           };
           // Only set cost when Shopify has one — don't clobber a PO-derived cost.
           if (unitCost != null) variantFields.production_cost = unitCost;

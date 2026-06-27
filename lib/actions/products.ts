@@ -28,6 +28,35 @@ export async function createProduct(formData: FormData) {
   redirect(`/products/${data.id}`);
 }
 
+export async function updateProduct(productId: string, formData: FormData) {
+  const name = (formData.get("name") as string)?.trim();
+  const description = ((formData.get("description") as string) || "").trim() || null;
+  const status = ((formData.get("status") as string) || "draft").trim();
+  const tagsRaw = (formData.get("tags") as string) || "";
+  const tags = tagsRaw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  if (!name) {
+    throw new Error("Name is required");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ name, description, status, tags: tags.length ? tags : null })
+    .eq("id", productId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/products");
+  revalidatePath(`/products/${productId}`);
+  redirect(`/products/${productId}`);
+}
+
 export async function createVariant(productId: string, formData: FormData) {
   const sku = formData.get("sku") as string;
   const size = (formData.get("size") as string) || null;

@@ -84,6 +84,7 @@ export interface Database {
           tags: string[] | null;
           shopify_product_id: string | null;
           status: string;
+          image_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -94,6 +95,7 @@ export interface Database {
           tags?: string[] | null;
           shopify_product_id?: string | null;
           status?: string;
+          image_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -104,6 +106,7 @@ export interface Database {
           tags?: string[] | null;
           shopify_product_id?: string | null;
           status?: string;
+          image_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -120,6 +123,7 @@ export interface Database {
           retail_price: number | null;
           production_cost: number | null;
           shopify_variant_id: string | null;
+          image_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -133,6 +137,7 @@ export interface Database {
           retail_price?: number | null;
           production_cost?: number | null;
           shopify_variant_id?: string | null;
+          image_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -146,6 +151,7 @@ export interface Database {
           retail_price?: number | null;
           production_cost?: number | null;
           shopify_variant_id?: string | null;
+          image_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };

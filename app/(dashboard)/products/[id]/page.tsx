@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createVariant } from "@/lib/actions/products";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,15 @@ export default async function ProductDetailPage({
             <p className="mt-1 text-sm text-ink/60">{product.description}</p>
           )}
         </div>
-        <Badge status={product.status} />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/products/${product.id}/edit`}
+            className="label-caps rounded-md border border-line px-3 py-1.5 text-ink/70 hover:border-ink hover:text-ink"
+          >
+            Edit
+          </Link>
+          <Badge status={product.status} />
+        </div>
       </div>
 
       <div className="space-y-3">
