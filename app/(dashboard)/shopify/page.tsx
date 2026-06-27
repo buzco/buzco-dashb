@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getShopInfo, isShopifyConfigured } from "@/lib/shopify/client";
 import { ShopifyMark } from "@/components/ui/shopify-mark";
 import { SyncButton } from "./sync-button";
+import { OrderSyncButton } from "./order-sync-button";
 
 const REQUIRED_SCOPES = [
   "read_products",
@@ -85,6 +86,17 @@ export default async function ShopifyPage() {
           overwritten. Currently {linkedProducts ?? 0} of {totalProducts ?? 0} products are linked.
         </p>
         <SyncButton disabled={!shop} />
+      </div>
+
+      {/* Orders */}
+      <div className="space-y-3">
+        <h2 className="label-caps text-ink/60">Import orders</h2>
+        <p className="text-sm text-ink/50">
+          Pulls Shopify order history into Sales (revenue), keyed by order so
+          re-running never double-counts. Stock isn&apos;t touched here — the
+          catalog sync already mirrors Shopify&apos;s on-hand.
+        </p>
+        <OrderSyncButton disabled={!shop} />
       </div>
     </div>
   );
