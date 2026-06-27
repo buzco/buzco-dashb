@@ -7,7 +7,10 @@ const NAV = [
   { href: "/products", label: "Products" },
   { href: "/purchase-orders", label: "Purchase Orders" },
   { href: "/inventory", label: "Inventory" },
+  { href: "/sales", label: "Sales" },
+  { href: "/consignments", label: "Consignments" },
   { href: "/suppliers", label: "Suppliers" },
+  { href: "/retailers", label: "Retailers" },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {

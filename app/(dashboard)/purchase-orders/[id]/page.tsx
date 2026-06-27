@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   addPurchaseOrderLine,
+  addPoSizeRun,
   setPurchaseOrderStatus,
   recordPurchaseOrderExpense,
 } from "@/lib/actions/purchase-orders";
+import { SIZE_RUN } from "@/lib/sizes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, Th, Td } from "@/components/ui/table";
@@ -61,6 +63,12 @@ export default async function PurchaseOrderDetailPage({
   const { data: products } = productIds.length
     ? await supabase.from("products").select("id, name").in("id", productIds)
     : { data: [] };
+  // All products (not just those with variants) for the size-run picker.
+  const { data: allProducts } = await supabase
+    .from("products")
+    .select("id, name")
+    .order("name");
+
   const productNameById = new Map((products ?? []).map((p) => [p.id, p.name]));
   const variantById = new Map(
     (allVariants ?? []).map((v) => [
@@ -173,7 +181,50 @@ export default async function PurchaseOrderDetailPage({
         )}
       </div>
 
-      {/* Add line */}
+      {/* Quick size run — the headline inbound flow */}
+      {!isTerminal && (
+        <div className="max-w-3xl space-y-3">
+          <h2 className="label-caps text-ink/60">Add size run</h2>
+          <p className="text-sm text-ink/50">
+            Enter a product and quantities per size — creates a variant (with an
+            auto SKU) and a line for each size at once.
+          </p>
+          <form action={addPoSizeRun.bind(null, po.id)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="product_id">Existing product</Label>
+                <Select id="product_id" name="product_id" defaultValue="">
+                  <option value="">— New product →</option>
+                  {(allProducts ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="new_product_name">…or new product name</Label>
+                <Input id="new_product_name" name="new_product_name" placeholder="Superior Entity tee" />
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {SIZE_RUN.map((s) => (
+                <div key={s} className="space-y-1">
+                  <Label htmlFor={`qty_${s}`}>{s}</Label>
+                  <Input id={`qty_${s}`} name={`qty_${s}`} type="number" min={0} defaultValue={0} />
+                </div>
+              ))}
+              <div className="space-y-1">
+                <Label htmlFor="run_unit_cost">Unit €</Label>
+                <Input id="run_unit_cost" name="unit_cost" type="number" step="0.01" />
+              </div>
+            </div>
+            <Button type="submit">Add size run</Button>
+          </form>
+        </div>
+      )}
+
+      {/* Add a single existing variant as a line */}
       {!isTerminal && (
         <div className="max-w-xl space-y-3">
           <h2 className="label-caps text-ink/60">Add line</h2>
