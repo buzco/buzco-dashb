@@ -522,6 +522,66 @@ export interface Database {
           },
         ];
       };
+      catalogs: {
+        Row: {
+          id: string;
+          name: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      catalog_items: {
+        Row: {
+          id: string;
+          catalog_id: string;
+          variant_id: string;
+          wholesale_price: number | null;
+        };
+        Insert: {
+          id?: string;
+          catalog_id: string;
+          variant_id: string;
+          wholesale_price?: number | null;
+        };
+        Update: {
+          id?: string;
+          catalog_id?: string;
+          variant_id?: string;
+          wholesale_price?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "catalog_items_catalog_id_fkey";
+            columns: ["catalog_id"];
+            isOneToOne: false;
+            referencedRelation: "catalogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "catalog_items_variant_id_fkey";
+            columns: ["variant_id"];
+            isOneToOne: false;
+            referencedRelation: "variants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       current_stock: {

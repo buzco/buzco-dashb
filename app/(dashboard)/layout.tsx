@@ -10,6 +10,7 @@ const NAV = [
   { href: "/purchase-orders", label: "Purchase Orders" },
   { href: "/sales", label: "Sales" },
   { href: "/consignments", label: "Consignments" },
+  { href: "/catalogs", label: "Catalogs" },
   { href: "/finance", label: "Finance" },
   { href: "/expenses", label: "Expenses" },
   { href: "/campaign", label: "Campaign" },
