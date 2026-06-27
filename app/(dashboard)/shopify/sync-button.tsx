@@ -28,6 +28,10 @@ export function SyncButton({ disabled }: { disabled?: boolean }) {
             Variants: {state.result.variantsCreated} created, {state.result.variantsLinked} linked,{" "}
             {state.result.variantsUpdated} updated
           </p>
+          <p>
+            Cost-of-goods set: {state.result.cogsUpdated} · Inventory reconciled:{" "}
+            {state.result.inventoryReconciled}
+          </p>
           {state.result.errors.length > 0 && (
             <div className="text-status-cancelled">
               <p>{state.result.errors.length} row(s) skipped:</p>
