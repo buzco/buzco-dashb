@@ -1,26 +1,41 @@
 @import "tailwindcss";
 
+/* Buzco brand: off-white/near-black, no dark-mode flip — the storefront
+   doesn't have one and this tool should look the same regardless of the
+   viewer's OS setting. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #0a0a0a;
+  --paper: #fafaf7;
+  --line: #e5e2da;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-line: var(--line);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* status/badge chips — translates the storefront's "NEW"/"LAST UNITS"
+     badge treatment into po_status / consignment status colors */
+  --color-status-draft: #d4d4d4;
+  --color-status-ordered: #fde047;
+  --color-status-partially_received: #fb923c;
+  --color-status-received: #86efac;
+  --color-status-cancelled: #fca5a5;
+  --color-status-active: #86efac;
+  --color-status-settled: #bfdbfe;
+  --color-status-returned: #d4d4d4;
+  --color-status-prospect: #d4d4d4;
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.label-caps {
+  @apply uppercase tracking-wider text-xs font-medium;
 }
