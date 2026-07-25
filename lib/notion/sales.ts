@@ -11,6 +11,11 @@ import { buildProperties } from "@/lib/notion/props";
 // reporting — our Postgres `sales` table stays the source of truth, and a
 // Notion outage must never block recording a sale.
 
+// The tracker's "Where" option for a market/pop-up. "Feira" already exists
+// alongside Physical/Ladra/Cyber Feira; it lands in the same pricing branch of
+// the Valor formula, so this is a labelling choice only.
+const MARKET_WHERE = "Feira";
+
 export type NotionSaleItem = {
   productName: string;
   size: string | null;
@@ -38,7 +43,12 @@ const ALIASES = {
   where: ["Where", "Onde", "Local", "Channel", "Canal"],
   status: ["Status", "Estado"],
   payment: ["Método pagamento", "Metodo pagamento", "Metodo de pagamento", "Payment method", "Pagamento"],
-  value: ["Valor", "Value", "Amount", "Preco", "Preço", "Price"],
+  // "Valor pago" first, deliberately: the tracker's original "Valor" is a
+  // FORMULA keyed on product name x location. It cannot be written, and it
+  // returns 0 for every current product (they predate the formula) and for
+  // anything tagged Oferta/Por pagar — so the amount actually charged, market
+  // discount included, needs its own plain Number column.
+  value: ["Valor pago", "Valor real", "Preço pago", "Amount paid", "Valor", "Value", "Amount"],
   quantity: ["Quantity", "Qty", "Qtd", "Quantidade"],
   market: ["Market", "Event", "Evento", "Feira"],
   soldAt: ["Sold at", "Data", "Date", "Data venda"],
@@ -74,7 +84,7 @@ export async function createSalePagesWithSchema(
       { aliases: [...ALIASES.size], value: item.size },
       { aliases: [...ALIASES.colour], value: item.colour },
       { aliases: [...ALIASES.sku], value: item.sku },
-      { aliases: [...ALIASES.where], value: "Physical" },
+      { aliases: [...ALIASES.where], value: MARKET_WHERE },
       { aliases: [...ALIASES.status], value: item.status },
       { aliases: [...ALIASES.payment], value: item.paymentMethod },
       { aliases: [...ALIASES.value], value: item.unitPrice },
