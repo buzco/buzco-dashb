@@ -60,8 +60,37 @@ export async function deleteMarketEvent(eventId: string) {
     .eq("market_event_id", eventId);
   if (count) throw new Error(`This event has ${count} sale(s) — close it instead of deleting`);
 
+  const { data: event } = await supabase
+    .from("market_events")
+    .select("location_id")
+    .eq("id", eventId)
+    .maybeSingle();
+  if (!event) throw new Error("Market event not found");
+
+  // Stock still in the crate would be stranded in a location about to vanish.
+  const { data: stock } = await supabase
+    .from("current_stock")
+    .select("quantity")
+    .eq("location_id", event.location_id)
+    .gt("quantity", 0);
+  const units = (stock ?? []).reduce((sum, row) => sum + row.quantity, 0);
+  if (units) {
+    throw new Error(`${units} unit(s) still in the crate — load them out before deleting`);
+  }
+
+  // market_prices and market_voided_lines cascade; the transfer movements and
+  // the event's own location do not, so clear them explicitly.
+  await supabase
+    .from("inventory_movements")
+    .delete()
+    .eq("reference_type", "market_event")
+    .eq("reference_id", eventId);
+
   const { error } = await supabase.from("market_events").delete().eq("id", eventId);
   if (error) throw new Error(error.message);
+
+  await supabase.from("inventory_locations").delete().eq("id", event.location_id);
+
   revalidatePath("/markets");
   redirect("/markets");
 }

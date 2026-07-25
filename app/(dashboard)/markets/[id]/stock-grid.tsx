@@ -221,7 +221,18 @@ function SellSheet({
   paymentMethods: string[];
   onClose: () => void;
 }) {
-  const methods = paymentMethods.length ? paymentMethods : FALLBACK_PAYMENT_METHODS;
+  // Notion permits near-duplicate select options — this tracker really does
+  // have both "Mbway André" and "Mbway André " — so collapse them on whitespace
+  // and case before showing the list.
+  const methods = useMemo(() => {
+    const source = paymentMethods.length ? paymentMethods : FALLBACK_PAYMENT_METHODS;
+    const seen = new Map<string, string>();
+    for (const m of source) {
+      const key = m.trim().toLowerCase();
+      if (!seen.has(key)) seen.set(key, m.trim());
+    }
+    return [...seen.values()];
+  }, [paymentMethods]);
   const [state, formAction, isPending] = useActionState(
     async (_prev: { error?: string } | undefined, formData: FormData) => {
       try {
@@ -235,7 +246,7 @@ function SellSheet({
     undefined,
   );
 
-  const [payment, setPayment] = useState(methods[0]);
+  const [payment, setPayment] = useState("");
 
   return (
     <div
@@ -261,7 +272,6 @@ function SellSheet({
 
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="variant_id" value={variant.variantId} />
-          <input type="hidden" name="payment_method" value={payment} />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -298,25 +308,31 @@ function SellSheet({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <span className="label-caps block text-ink/60">Paid with</span>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-1">
+            <label htmlFor="payment_method" className="label-caps block text-ink/60">
+              Paid with
+            </label>
+            {/* A dropdown, not chips: the tracker has 17 payment options and
+                several name a specific person, so a grid of chips both buried
+                the rest of the form and made a mis-tap attribute cash to the
+                wrong person. No default for the same reason — pick it. */}
+            <select
+              id="payment_method"
+              name="payment_method"
+              value={payment}
+              onChange={(e) => setPayment(e.target.value)}
+              required
+              className="w-full rounded-md border border-line bg-surface px-3 py-3 text-base text-bone outline-none focus:border-ink"
+            >
+              <option value="" disabled>
+                Pick how they paid…
+              </option>
               {methods.map((method) => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => setPayment(method)}
-                  aria-pressed={payment === method}
-                  className={`label-caps rounded-md border px-3 py-2 ${
-                    payment === method
-                      ? "border-ink bg-ink/10 text-ink"
-                      : "border-line text-ink/60 hover:border-ink/50"
-                  }`}
-                >
+                <option key={method} value={method}>
                   {method}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
           <div className="space-y-1">

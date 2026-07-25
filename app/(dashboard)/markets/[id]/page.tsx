@@ -211,11 +211,19 @@ async function loadVariantOptions(marketLocationId: string): Promise<VariantOpti
     );
   }
 
+  // The SKU is always shown, not just as a fallback: three separate Shopify
+  // products are all named "Butterfly Thermal Waffle Longsleeve" (colourways
+  // with no colour set), so name+size alone renders five sets of identical
+  // options and you cannot tell which one you're packing.
   return (variants ?? [])
-    .map((v) => ({
-      id: v.id,
-      label: `${nameById.get(v.product_id) ?? "Unknown"} — ${[v.size, v.color].filter(Boolean).join(" / ") || v.sku}`,
-      available: availableByVariant.get(v.id) ?? 0,
-    }))
+    .map((v) => {
+      const attrs = [v.size, v.color].filter(Boolean).join(" / ");
+      const name = nameById.get(v.product_id) ?? "Unknown";
+      return {
+        id: v.id,
+        label: attrs ? `${name} — ${attrs} · ${v.sku}` : `${name} — ${v.sku}`,
+        available: availableByVariant.get(v.id) ?? 0,
+      };
+    })
     .sort((a, b) => Number(b.available > 0) - Number(a.available > 0) || a.label.localeCompare(b.label));
 }

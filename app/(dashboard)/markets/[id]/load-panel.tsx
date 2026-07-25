@@ -1,4 +1,9 @@
-import { loadInVariant, loadOutVariant, loadOutEverything } from "@/lib/actions/markets";
+import {
+  deleteMarketEvent,
+  loadInVariant,
+  loadOutVariant,
+  loadOutEverything,
+} from "@/lib/actions/markets";
 import { Button } from "@/components/ui/button";
 import { Label, Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -110,7 +115,21 @@ export function LoadPanel({
         </div>
 
         {!loaded.length ? (
-          <p className="text-sm text-ink/50">The crate is empty.</p>
+          <div className="space-y-3">
+            <p className="text-sm text-ink/50">The crate is empty.</p>
+            {/* Only offered once the crate is empty and there are no sales —
+                deleteMarketEvent enforces both server-side anyway. */}
+            {!data.sales.length && (
+              <form action={deleteMarketEvent.bind(null, event.id)}>
+                <button
+                  type="submit"
+                  className="label-caps rounded-md border border-status-cancelled/60 px-3 py-2 text-status-cancelled hover:bg-status-cancelled/10"
+                >
+                  Delete this event
+                </button>
+              </form>
+            )}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>

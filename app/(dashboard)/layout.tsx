@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 
 const NAV = [
   { href: "/", label: "Overview" },
@@ -31,15 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* Mobile: collapsible top bar. <details> keeps it zero-JS. */}
       <details className="group border-b border-line bg-surface/80 backdrop-blur-sm md:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between p-4">
-          <Image
-            src="/buzco-logo.gif"
-            alt="Buzco"
-            width={96}
-            height={54}
-            priority
-            unoptimized
-            className="h-8 w-auto"
-          />
+          <Logo width={96} height={54} className="h-8 w-auto" />
           <span className="label-caps text-ink/70 group-open:hidden">Menu</span>
           <span className="label-caps hidden text-ink/70 group-open:inline">Close</span>
         </summary>
@@ -68,15 +60,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <aside className="hidden w-56 flex-col justify-between border-r border-line bg-surface/80 p-6 backdrop-blur-sm md:flex">
         <div>
           <div className="mb-8">
-            <Image
-              src="/buzco-logo.gif"
-              alt="Buzco"
-              width={176}
-              height={99}
-              priority
-              unoptimized
-              className="h-auto w-full"
-            />
+            <Logo width={176} height={99} className="h-auto w-full" />
             <p className="label-caps mt-1 text-center text-ink/50">Ops</p>
           </div>
           <nav className="space-y-0.5">
