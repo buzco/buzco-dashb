@@ -85,16 +85,16 @@ export function RaffleQuickAdd({
       </div>
 
       <p className="label-caps mb-2 text-ink/60">2 · Pago com</p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {STALL_PAYMENTS.map((p) => (
           <button
             key={p.id}
             type="button"
             disabled={pending}
             onClick={() => sell(p.id)}
-            className="rounded-lg border border-line bg-surface px-3 py-8 transition-colors hover:border-pink disabled:opacity-50"
+            className="rounded-lg border border-line bg-surface px-2 py-8 transition-colors hover:border-pink disabled:opacity-50"
           >
-            <span className="block text-center text-lg font-medium text-bone">{p.label}</span>
+            <span className="block text-center text-base font-medium text-bone">{p.label}</span>
           </button>
         ))}
       </div>

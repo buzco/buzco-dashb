@@ -32,6 +32,7 @@ export const RAFFLE_PAYMENTS = [
 export const STALL_PAYMENTS = [
   { id: "cash", notionOption: "Cash", label: "Cash" },
   { id: "revolut", notionOption: "Revolut", label: "Revolut" },
+  { id: "mbway", notionOption: "MBWAY", label: "MBWAY" },
 ] as const;
 
 /** Every option any surface can submit. */

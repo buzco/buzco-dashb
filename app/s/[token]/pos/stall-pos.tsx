@@ -262,14 +262,14 @@ function SellSheet({
           {/* Two buttons, not the tracker's full option list: a helper has no
               way to know whose Revolut or which brand's cash it is, and a wrong
               guess is worse than reconciling it later in the dashboard. */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {STALL_PAYMENTS.map((m) => (
               <button
                 key={m.id}
                 type="button"
                 onClick={() => setPayment(m.notionOption)}
                 aria-pressed={payment === m.notionOption}
-                className={`rounded-lg border px-3 py-5 text-lg font-medium transition-colors ${
+                className={`rounded-lg border px-2 py-5 text-base font-medium transition-colors ${
                   payment === m.notionOption
                     ? "border-ink bg-ink/10 text-ink"
                     : "border-line text-bone hover:border-ink/50"
@@ -300,7 +300,7 @@ function SellSheet({
           disabled={isPending || !payment}
           className="label-caps w-full rounded-md bg-pink px-4 py-4 text-base text-black disabled:opacity-50"
         >
-          {isPending ? "Recording…" : payment ? "Record sale" : "Pick Cash or Revolut"}
+          {isPending ? "Recording…" : payment ? "Record sale" : "Pick how they paid"}
         </button>
       </form>
     </Sheet>
