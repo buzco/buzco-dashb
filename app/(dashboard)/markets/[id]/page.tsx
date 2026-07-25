@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { setMarketStatus } from "@/lib/actions/markets";
+import { deleteMarketEvent, setMarketStatus } from "@/lib/actions/markets";
 import { hasRaffleDb, isNotionConfigured } from "@/lib/notion/client";
 import { getRaffleTickets, type RaffleTicket } from "@/lib/notion/raffle";
 import { getPaymentMethodOptions } from "@/lib/notion/sales";
 import { raffleTotalsForEvent } from "@/lib/market/raffle-sales";
 import { loadMarketData } from "./market-data";
 import { StockGrid } from "./stock-grid";
-import { LoadPanel, type VariantOption } from "./load-panel";
 import { PricesPanel } from "./prices-panel";
 import { SalesPanel } from "./sales-panel";
 import { RafflePanel } from "./raffle-panel";
@@ -20,7 +19,6 @@ const TABS = [
   { key: "stock", label: "Stock" },
   { key: "sales", label: "Sales" },
   { key: "prices", label: "Prices" },
-  { key: "load", label: "Load" },
   { key: "raffle", label: "Raffle" },
 ] as const;
 
@@ -42,12 +40,6 @@ export default async function MarketEventPage({
 
   const { event, totals } = data;
   const notionConfigured = isNotionConfigured();
-
-  // Load-tab-only extras: every variant plus what's available to pack from.
-  let variantOptions: VariantOption[] = [];
-  if (tab === "load") {
-    variantOptions = await loadVariantOptions(event.location_id);
-  }
 
   // The sell sheet offers the tracker's own payment options (cached, never
   // throws) so a manual sale can't invent a new option in their database.
@@ -72,17 +64,9 @@ export default async function MarketEventPage({
     }
   }
 
-  // Default the load-in source to wherever the stock actually is, not to the
-  // warehouse on principle — Main Warehouse currently holds 0 units (everything
-  // sits in the Shopify mirror location), so defaulting by type alone would make
-  // every load-in fail market_load_in's source guard. Warehouse breaks ties.
-  const sourceLocations = data.locations.filter((l) => l.id !== event.location_id);
-  const defaultFromLocationId =
-    [...sourceLocations].sort(
-      (a, b) =>
-        b.stockTotal - a.stockTotal ||
-        Number(b.type === "warehouse") - Number(a.type === "warehouse"),
-    )[0]?.id ?? "";
+  // Deleting is only offered once an event has no sales — deleteMarketEvent
+  // enforces that server-side too. It lived on the retired Load tab.
+  const canDelete = data.sales.length === 0;
 
   return (
     <div className="space-y-6">
@@ -124,12 +108,22 @@ export default async function MarketEventPage({
                 </button>
               </form>
             ))}
+            {canDelete && (
+              <form action={deleteMarketEvent.bind(null, event.id)}>
+                <button
+                  type="submit"
+                  className="label-caps rounded-full border border-status-cancelled/50 px-3 py-1 text-status-cancelled hover:bg-status-cancelled/10"
+                >
+                  Delete
+                </button>
+              </form>
+            )}
           </div>
         </div>
 
         {/* The three numbers that matter mid-event, big enough to read standing up. */}
         <div className="grid grid-cols-3 gap-3">
-          <Stat label="In crate" value={String(totals.inCrate)} />
+          <Stat label="Available" value={String(totals.available)} />
           <Stat label="Sold" value={String(totals.sold)} />
           <Stat label="Taken" value={`€${totals.revenue.toFixed(2)}`} accent />
         </div>
@@ -164,13 +158,6 @@ export default async function MarketEventPage({
       )}
       {tab === "sales" && <SalesPanel data={data} notionConfigured={notionConfigured} />}
       {tab === "prices" && <PricesPanel data={data} />}
-      {tab === "load" && (
-        <LoadPanel
-          data={data}
-          variantOptions={variantOptions}
-          defaultFromLocationId={defaultFromLocationId}
-        />
-      )}
       {tab === "raffle" && (
         <RafflePanel
           eventId={event.id}
@@ -192,48 +179,4 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
       </p>
     </div>
   );
-}
-
-/**
- * Everything packable, labelled and annotated with how many units exist outside
- * this market's own crate — so you can't try to load what you don't have.
- */
-async function loadVariantOptions(marketLocationId: string): Promise<VariantOption[]> {
-  const supabase = await createClient();
-
-  const [{ data: variants }, { data: stock }] = await Promise.all([
-    supabase.from("variants").select("id, product_id, size, color, sku").order("sku"),
-    supabase.from("current_stock").select("variant_id, location_id, quantity"),
-  ]);
-
-  const productIds = [...new Set((variants ?? []).map((v) => v.product_id))];
-  const { data: products } = productIds.length
-    ? await supabase.from("products").select("id, name").in("id", productIds)
-    : { data: [] };
-  const nameById = new Map((products ?? []).map((p) => [p.id, p.name]));
-
-  const availableByVariant = new Map<string, number>();
-  for (const row of stock ?? []) {
-    if (row.location_id === marketLocationId) continue;
-    availableByVariant.set(
-      row.variant_id,
-      (availableByVariant.get(row.variant_id) ?? 0) + row.quantity,
-    );
-  }
-
-  // The SKU is always shown, not just as a fallback: three separate Shopify
-  // products are all named "Butterfly Thermal Waffle Longsleeve" (colourways
-  // with no colour set), so name+size alone renders five sets of identical
-  // options and you cannot tell which one you're packing.
-  return (variants ?? [])
-    .map((v) => {
-      const attrs = [v.size, v.color].filter(Boolean).join(" / ");
-      const name = nameById.get(v.product_id) ?? "Unknown";
-      return {
-        id: v.id,
-        label: attrs ? `${name} — ${attrs} · ${v.sku}` : `${name} — ${v.sku}`,
-        available: availableByVariant.get(v.id) ?? 0,
-      };
-    })
-    .sort((a, b) => Number(b.available > 0) - Number(a.available > 0) || a.label.localeCompare(b.label));
 }

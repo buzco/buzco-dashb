@@ -14,7 +14,7 @@ export type MarketVariantView = {
   sku: string;
   retailPrice: number | null;
   /** Units physically left at the market right now. */
-  inCrate: number;
+  available: number;
   /** Units sold at this event. */
   sold: number;
   /** Today's price for this size, after override resolution. */
@@ -28,7 +28,7 @@ export type MarketProductView = {
   name: string;
   imageUrl: string | null;
   variants: MarketVariantView[];
-  inCrate: number;
+  available: number;
   sold: number;
   /** The event's product-level price override, if one is set. */
   eventPrice: number | null;
@@ -68,7 +68,7 @@ export type MarketData = {
   event: MarketEvent;
   products: MarketProductView[];
   sales: MarketSaleView[];
-  totals: { inCrate: number; sold: number; revenue: number; unsyncedNotion: number };
+  totals: { available: number; sold: number; revenue: number; unsyncedNotion: number };
   /** `stockTotal` drives the load-in default: pointing at an empty location
    *  (their Main Warehouse holds 0 — everything sits in the Shopify mirror)
    *  makes every load-in fail the source guard. */
@@ -100,14 +100,24 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
     .maybeSingle();
   if (!event) return null;
 
-  // current_stock keeps a row at 0 once something is loaded and then sold out,
-  // which is exactly what we want — "sold out" must stay visible on the grid.
+  // Shopify is the stock centre, so what's sellable at a market is simply what
+  // Shopify has — not a per-event crate. Selling creates a real Shopify order
+  // which decrements this same pool, so the grid and the till agree.
+  const { data: shopifyLoc } = await supabase
+    .from("inventory_locations")
+    .select("id")
+    .eq("type", "shopify")
+    .limit(1)
+    .maybeSingle();
+  const stockLocationId = shopifyLoc?.id ?? event.location_id;
+
   const [{ data: stock }, { data: prices }, { data: saleRows }, { data: locations }, { data: allStock }] =
     await Promise.all([
       supabase
         .from("current_stock")
         .select("variant_id, quantity")
-        .eq("location_id", event.location_id),
+        .eq("location_id", stockLocationId)
+        .gt("quantity", 0),
       supabase
         .from("market_prices")
         .select("product_id, variant_id, price")
@@ -172,7 +182,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
         name: product?.name ?? "Unknown product",
         imageUrl: product?.image_url ?? null,
         variants: [],
-        inCrate: 0,
+        available: 0,
         sold: 0,
         eventPrice: productOverrides.get(v.product_id) ?? null,
         retailPrice: null,
@@ -188,7 +198,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
       variantOverrides,
       productOverrides,
     );
-    const inCrate = crateByVariant.get(v.id) ?? 0;
+    const available = crateByVariant.get(v.id) ?? 0;
     const sold = soldByVariant.get(v.id) ?? 0;
 
     entry.variants.push({
@@ -197,12 +207,12 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
       color: v.color,
       sku: v.sku,
       retailPrice: retail,
-      inCrate,
+      available,
       sold,
       price,
       discounted,
     });
-    entry.inCrate += inCrate;
+    entry.available += available;
     entry.sold += sold;
     if (retail != null) entry.retailPrice = Math.max(entry.retailPrice ?? 0, retail);
   }
@@ -240,7 +250,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
     products: productList,
     sales,
     totals: {
-      inCrate: productList.reduce((sum, p) => sum + p.inCrate, 0),
+      available: productList.reduce((sum, p) => sum + p.available, 0),
       sold: sales.reduce((sum, s) => sum + s.quantity, 0),
       revenue: sales.reduce((sum, s) => sum + s.netAmount, 0),
       unsyncedNotion: sales.filter((s) => !s.notionPageId).length,

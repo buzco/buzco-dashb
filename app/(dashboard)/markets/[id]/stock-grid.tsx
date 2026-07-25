@@ -20,9 +20,9 @@ function euro(n: number | null): string {
 }
 
 /** Colour carries the stock level so you don't have to read the number. */
-function chipTone(inCrate: number): string {
-  if (inCrate <= 0) return "border-line bg-transparent text-ink/25 line-through";
-  if (inCrate <= 2) return "border-status-ordered bg-status-ordered/10 text-status-ordered";
+function chipTone(available: number): string {
+  if (available <= 0) return "border-line bg-transparent text-ink/25 line-through";
+  if (available <= 2) return "border-status-ordered bg-status-ordered/10 text-status-ordered";
   return "border-status-active bg-status-active/10 text-status-active";
 }
 
@@ -48,7 +48,7 @@ export function StockGrid({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
-      if (hideSoldOut && p.inCrate <= 0) return false;
+      if (hideSoldOut && p.available <= 0) return false;
       if (!q) return true;
       return (
         p.name.toLowerCase().includes(q) ||
@@ -60,8 +60,8 @@ export function StockGrid({
   if (!products.length) {
     return (
       <p className="text-sm text-ink/50">
-        Nothing loaded yet. Use the <span className="text-ink">Load</span> tab to put stock in the
-        crate.
+        Nothing sellable — Shopify shows no stock on hand. Add inventory in Shopify, then run{" "}
+        <span className="text-ink">Sync from Shopify</span>.
       </p>
     );
   }
@@ -139,7 +139,7 @@ function ProductCard({
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-lg border bg-surface ${
-        product.inCrate <= 0 ? "border-line opacity-60" : "border-line"
+        product.available <= 0 ? "border-line opacity-60" : "border-line"
       }`}
     >
       <div className="relative aspect-square w-full bg-ink/5">
@@ -156,7 +156,7 @@ function ProductCard({
             <span className="label-caps text-ink/30">No image</span>
           </div>
         )}
-        {product.inCrate <= 0 && (
+        {product.available <= 0 && (
           <div className="absolute inset-0 flex items-center justify-center bg-paper/70">
             <span className="label-caps rounded-full border border-status-cancelled px-3 py-1 text-status-cancelled">
               Sold out
@@ -164,7 +164,7 @@ function ProductCard({
           </div>
         )}
         <span className="absolute right-2 top-2 rounded-full bg-paper/85 px-2 py-0.5 font-mono text-xs tabular-nums text-bone">
-          {product.inCrate}
+          {product.available}
         </span>
       </div>
 
@@ -187,13 +187,13 @@ function ProductCard({
             <button
               key={v.variantId}
               type="button"
-              disabled={readOnly || v.inCrate <= 0}
+              disabled={readOnly || v.available <= 0}
               onClick={() => onPick(v)}
-              title={`${v.sku} · ${v.inCrate} left · ${euro(v.price)}`}
-              className={`label-caps min-w-11 rounded-md border px-2 py-2 tabular-nums transition-colors disabled:cursor-not-allowed ${chipTone(v.inCrate)}`}
+              title={`${v.sku} · ${v.available} left · ${euro(v.price)}`}
+              className={`label-caps min-w-11 rounded-md border px-2 py-2 tabular-nums transition-colors disabled:cursor-not-allowed ${chipTone(v.available)}`}
             >
               {v.size ?? v.color ?? v.sku}
-              <span className="ml-1 font-mono text-[0.7rem] opacity-70">{v.inCrate}</span>
+              <span className="ml-1 font-mono text-[0.7rem] opacity-70">{v.available}</span>
             </button>
           ))}
         </div>
@@ -262,7 +262,7 @@ function SellSheet({
           <div>
             <p className="font-medium text-bone">{product.name}</p>
             <p className="label-caps text-ink/50">
-              {variant.size ?? variant.color ?? variant.sku} · {variant.inCrate} left
+              {variant.size ?? variant.color ?? variant.sku} · {variant.available} left
             </p>
           </div>
           <button type="button" onClick={onClose} className="label-caps text-ink/60 hover:text-ink">
@@ -299,7 +299,7 @@ function SellSheet({
                 name="quantity"
                 type="number"
                 min={1}
-                max={variant.inCrate}
+                max={variant.available}
                 inputMode="numeric"
                 defaultValue={1}
                 required

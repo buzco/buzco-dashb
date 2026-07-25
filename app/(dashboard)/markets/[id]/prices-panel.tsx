@@ -75,7 +75,7 @@ export function PricesPanel({ data }: { data: MarketData }) {
                             : "—"}
                       </span>
                       {" · "}
-                      <span className="font-mono tabular-nums">{p.inCrate}</span> in crate
+                      <span className="font-mono tabular-nums">{p.available}</span> in crate
                     </p>
                   </div>
                   <form
