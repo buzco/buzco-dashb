@@ -69,7 +69,10 @@ export type MarketData = {
   products: MarketProductView[];
   sales: MarketSaleView[];
   totals: { inCrate: number; sold: number; revenue: number; unsyncedNotion: number };
-  locations: Array<{ id: string; name: string; type: string }>;
+  /** `stockTotal` drives the load-in default: pointing at an empty location
+   *  (their Main Warehouse holds 0 — everything sits in the Shopify mirror)
+   *  makes every load-in fail the source guard. */
+  locations: Array<{ id: string; name: string; type: string; stockTotal: number }>;
 };
 
 /** variant override -> product default -> variant retail price. */
@@ -99,7 +102,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
 
   // current_stock keeps a row at 0 once something is loaded and then sold out,
   // which is exactly what we want — "sold out" must stay visible on the grid.
-  const [{ data: stock }, { data: prices }, { data: saleRows }, { data: locations }] =
+  const [{ data: stock }, { data: prices }, { data: saleRows }, { data: locations }, { data: allStock }] =
     await Promise.all([
       supabase
         .from("current_stock")
@@ -117,7 +120,16 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
         .eq("market_event_id", eventId)
         .order("sold_at", { ascending: false }),
       supabase.from("inventory_locations").select("id, name, type").order("name"),
+      supabase.from("current_stock").select("location_id, quantity"),
     ]);
+
+  const stockTotalByLocation = new Map<string, number>();
+  for (const row of allStock ?? []) {
+    stockTotalByLocation.set(
+      row.location_id,
+      (stockTotalByLocation.get(row.location_id) ?? 0) + row.quantity,
+    );
+  }
 
   const crateByVariant = new Map((stock ?? []).map((s) => [s.variant_id, s.quantity]));
   const soldByVariant = new Map<string, number>();
@@ -229,7 +241,10 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
       revenue: sales.reduce((sum, s) => sum + s.netAmount, 0),
       unsyncedNotion: sales.filter((s) => !s.notionPageId).length,
     },
-    locations: locations ?? [],
+    locations: (locations ?? []).map((l) => ({
+      ...l,
+      stockTotal: stockTotalByLocation.get(l.id) ?? 0,
+    })),
   };
 }
 

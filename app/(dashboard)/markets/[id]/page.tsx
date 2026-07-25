@@ -67,9 +67,17 @@ export default async function MarketEventPage({
     }
   }
 
-  const warehouse = data.locations.find((l) => l.type === "warehouse");
+  // Default the load-in source to wherever the stock actually is, not to the
+  // warehouse on principle — Main Warehouse currently holds 0 units (everything
+  // sits in the Shopify mirror location), so defaulting by type alone would make
+  // every load-in fail market_load_in's source guard. Warehouse breaks ties.
+  const sourceLocations = data.locations.filter((l) => l.id !== event.location_id);
   const defaultFromLocationId =
-    warehouse?.id ?? data.locations.find((l) => l.id !== event.location_id)?.id ?? "";
+    [...sourceLocations].sort(
+      (a, b) =>
+        b.stockTotal - a.stockTotal ||
+        Number(b.type === "warehouse") - Number(a.type === "warehouse"),
+    )[0]?.id ?? "";
 
   return (
     <div className="space-y-6">

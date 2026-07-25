@@ -27,6 +27,7 @@ export function LoadPanel({
   const { event, products, locations } = data;
   // The crate itself is not a valid source or destination.
   const otherLocations = locations.filter((l) => l.id !== event.location_id);
+  const sourceHoldingStock = otherLocations.find((l) => l.id === defaultFromLocationId);
   const loaded = products.flatMap((p) =>
     p.variants
       .filter((v) => v.inCrate > 0)
@@ -35,6 +36,23 @@ export function LoadPanel({
 
   return (
     <div className="space-y-10">
+      {/* Loading out of the Shopify mirror location is currently the only option
+          (Main Warehouse holds 0), but syncFromShopify() force-sets that
+          location to Shopify's on-hand — so a sync run while stock is at the
+          stall silently re-inflates it. Warn rather than pretend. */}
+      {sourceHoldingStock?.type === "shopify" && (
+        <div className="rounded-lg border border-status-ordered/60 bg-surface p-4">
+          <p className="label-caps text-status-ordered">Don&apos;t run the Shopify sync mid-event</p>
+          <p className="mt-1 text-sm text-ink/60">
+            Your stock lives in the <span className="text-bone">{sourceHoldingStock.name}</span>{" "}
+            mirror location, so that&apos;s where the crate is packed from. The Shopify page&apos;s
+            &quot;Sync from Shopify&quot; forces that location back to Shopify&apos;s own on-hand
+            number, which would re-add the units you carried out and overstate total stock. Load
+            everything back in before syncing.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-3">
         <h2 className="label-caps text-ink/60">Load into the crate</h2>
         <form action={loadInVariant.bind(null, event.id)} className="max-w-2xl space-y-4">
