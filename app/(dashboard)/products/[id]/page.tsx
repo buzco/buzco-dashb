@@ -50,7 +50,7 @@ export default async function ProductDetailPage({
       </div>
 
       {!product.shopify_product_id && (
-        <PushToShopify productId={product.id} />
+        <PushToShopify productId={product.id} status={product.status} />
       )}
 
       <div className="space-y-3">
