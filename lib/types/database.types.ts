@@ -397,6 +397,12 @@ export interface Database {
           fees_amount: number;
           net_amount: number;
           shopify_order_id: string | null;
+          shopify_line_item_id: string | null;
+          payment_method: string | null;
+          market_event_id: string | null;
+          notion_page_id: string | null;
+          notion_synced_at: string | null;
+          notion_error: string | null;
           customer_ref: string | null;
           sold_at: string;
           notes: string | null;
@@ -411,6 +417,12 @@ export interface Database {
           shipping_amount?: number;
           fees_amount?: number;
           shopify_order_id?: string | null;
+          shopify_line_item_id?: string | null;
+          payment_method?: string | null;
+          market_event_id?: string | null;
+          notion_page_id?: string | null;
+          notion_synced_at?: string | null;
+          notion_error?: string | null;
           customer_ref?: string | null;
           sold_at?: string;
           notes?: string | null;
@@ -425,6 +437,12 @@ export interface Database {
           shipping_amount?: number;
           fees_amount?: number;
           shopify_order_id?: string | null;
+          shopify_line_item_id?: string | null;
+          payment_method?: string | null;
+          market_event_id?: string | null;
+          notion_page_id?: string | null;
+          notion_synced_at?: string | null;
+          notion_error?: string | null;
           customer_ref?: string | null;
           sold_at?: string;
           notes?: string | null;
@@ -435,6 +453,13 @@ export interface Database {
             columns: ["variant_id"];
             isOneToOne: false;
             referencedRelation: "variants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_market_event_id_fkey";
+            columns: ["market_event_id"];
+            isOneToOne: false;
+            referencedRelation: "market_events";
             referencedColumns: ["id"];
           },
         ];
@@ -546,6 +571,131 @@ export interface Database {
         };
         Relationships: [];
       };
+      market_events: {
+        Row: {
+          id: string;
+          name: string;
+          venue: string | null;
+          starts_at: string;
+          ends_at: string | null;
+          status: string;
+          location_id: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          venue?: string | null;
+          starts_at?: string;
+          ends_at?: string | null;
+          status?: string;
+          location_id: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          venue?: string | null;
+          starts_at?: string;
+          ends_at?: string | null;
+          status?: string;
+          location_id?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "market_events_location_id_fkey";
+            columns: ["location_id"];
+            isOneToOne: false;
+            referencedRelation: "inventory_locations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      market_prices: {
+        Row: {
+          id: string;
+          market_event_id: string;
+          product_id: string;
+          variant_id: string | null;
+          price: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          market_event_id: string;
+          product_id: string;
+          variant_id?: string | null;
+          price: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          market_event_id?: string;
+          product_id?: string;
+          variant_id?: string | null;
+          price?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "market_prices_market_event_id_fkey";
+            columns: ["market_event_id"];
+            isOneToOne: false;
+            referencedRelation: "market_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "market_prices_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "market_prices_variant_id_fkey";
+            columns: ["variant_id"];
+            isOneToOne: false;
+            referencedRelation: "variants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      market_voided_lines: {
+        Row: {
+          shopify_line_item_id: string;
+          market_event_id: string | null;
+          voided_at: string;
+        };
+        Insert: {
+          shopify_line_item_id: string;
+          market_event_id?: string | null;
+          voided_at?: string;
+        };
+        Update: {
+          shopify_line_item_id?: string;
+          market_event_id?: string | null;
+          voided_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "market_voided_lines_market_event_id_fkey";
+            columns: ["market_event_id"];
+            isOneToOne: false;
+            referencedRelation: "market_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       catalog_items: {
         Row: {
           id: string;
@@ -648,6 +798,68 @@ export interface Database {
           p_to_location_id: string;
         };
         Returns: Database["public"]["Tables"]["consignment_lines"]["Row"];
+      };
+      create_market_event: {
+        Args: {
+          p_name: string;
+          p_venue?: string | null;
+          p_starts_at?: string;
+          p_ends_at?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["market_events"]["Row"];
+      };
+      market_load_in: {
+        Args: {
+          p_market_event_id: string;
+          p_variant_id: string;
+          p_quantity: number;
+          p_from_location_id: string;
+        };
+        Returns: undefined;
+      };
+      market_load_out: {
+        Args: {
+          p_market_event_id: string;
+          p_variant_id: string;
+          p_quantity: number;
+          p_to_location_id: string;
+        };
+        Returns: undefined;
+      };
+      log_market_sale: {
+        Args: {
+          p_market_event_id: string;
+          p_variant_id: string;
+          p_quantity: number;
+          p_gross_amount: number;
+          p_discount_amount?: number;
+          p_fees_amount?: number;
+          p_customer_ref?: string | null;
+          p_notes?: string | null;
+          p_payment_method?: string | null;
+          p_shopify_order_id?: string | null;
+          p_shopify_line_item_id?: string | null;
+          p_sold_at?: string;
+        };
+        Returns: Database["public"]["Tables"]["sales"]["Row"];
+      };
+      set_market_price: {
+        Args: {
+          p_market_event_id: string;
+          p_product_id: string;
+          p_variant_id?: string | null;
+          p_price?: number | null;
+        };
+        Returns: undefined;
+      };
+      bulk_discount_market: {
+        Args: { p_market_event_id: string; p_percent: number };
+        Returns: number;
+      };
+      void_market_sale: {
+        Args: { p_sale_id: string };
+        Returns: undefined;
       };
     };
     Enums: {

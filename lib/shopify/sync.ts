@@ -20,8 +20,49 @@ export type SyncResult = {
   variantsLinked: number;
   cogsUpdated: number;
   inventoryReconciled: number;
+  /**
+   * Set when inventory reconciliation was deliberately skipped because units are
+   * currently out at a market. Products/costs/images still sync.
+   */
+  inventorySkippedReason: string | null;
   errors: string[];
 };
+
+/**
+ * Units sitting in any market crate right now.
+ *
+ * Reconciliation force-sets the 'shopify' location to Shopify's on-hand. Once
+ * stock has been physically carried out of that pool to a stall, Shopify's
+ * number no longer describes it, and reconciling would re-add the units that
+ * left — inflating total stock with no visible error. Since there is no
+ * inventory write-back to Shopify yet, the only safe move is to skip the
+ * reconciliation while a crate is loaded and say so.
+ */
+async function unitsAtMarkets(
+  supabase: SupabaseClient,
+): Promise<{ units: number; events: string[] }> {
+  const { data: events } = await supabase
+    .from("market_events")
+    .select("name, location_id")
+    .neq("status", "closed");
+  if (!events?.length) return { units: 0, events: [] };
+
+  const byLocation = new Map(events.map((e) => [e.location_id, e.name]));
+  const { data: stock } = await supabase
+    .from("current_stock")
+    .select("location_id, quantity")
+    .in("location_id", [...byLocation.keys()]);
+
+  let units = 0;
+  const names = new Set<string>();
+  for (const row of stock ?? []) {
+    if (row.quantity <= 0) continue;
+    units += row.quantity;
+    const name = byLocation.get(row.location_id);
+    if (name) names.add(name);
+  }
+  return { units, events: [...names] };
+}
 
 type ShopifyVariant = {
   id: string;
@@ -144,10 +185,19 @@ export async function syncFromShopify(): Promise<SyncResult> {
     variantsLinked: 0,
     cogsUpdated: 0,
     inventoryReconciled: 0,
+    inventorySkippedReason: null,
     errors: [],
   };
 
   const shopifyLocationId = await getShopifyLocationId(supabase);
+
+  const atMarkets = await unitsAtMarkets(supabase);
+  if (atMarkets.units > 0) {
+    result.inventorySkippedReason =
+      `${atMarkets.units} unit(s) are currently out at ${atMarkets.events.join(", ")}. ` +
+      `Inventory reconciliation was skipped so those units aren't added back twice — ` +
+      `load the crate back in (or close the event) and sync again.`;
+  }
 
   let cursor: string | null = null;
   let hasNext = true;
@@ -262,13 +312,15 @@ export async function syncFromShopify(): Promise<SyncResult> {
 
           if (unitCost != null) result.cogsUpdated++;
 
-          const reconciled = await reconcileInventory(
-            supabase,
-            variantDbId,
-            shopifyLocationId,
-            v.inventoryQuantity ?? 0,
-          );
-          if (reconciled) result.inventoryReconciled++;
+          if (!result.inventorySkippedReason) {
+            const reconciled = await reconcileInventory(
+              supabase,
+              variantDbId,
+              shopifyLocationId,
+              v.inventoryQuantity ?? 0,
+            );
+            if (reconciled) result.inventoryReconciled++;
+          }
         }
       } catch (e) {
         result.errors.push(e instanceof Error ? e.message : String(e));

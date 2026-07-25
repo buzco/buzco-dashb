@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV = [
   { href: "/", label: "Overview" },
   { href: "/products", label: "Catalog" },
+  { href: "/markets", label: "Markets" },
   { href: "/purchase-orders", label: "Purchase Orders" },
   { href: "/sales", label: "Sales" },
   { href: "/consignments", label: "Consignments" },
@@ -24,8 +25,47 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <div className="flex min-h-screen flex-1 bg-paper text-ink">
-      <aside className="flex w-56 flex-col justify-between border-r border-line bg-surface/80 p-6 backdrop-blur-sm">
+    // Column on phones (top bar + content), sidebar from md up. The markets tab
+    // gets used one-handed at a stall, so mobile can't lose 224px to nav chrome.
+    <div className="flex min-h-screen flex-1 flex-col bg-paper text-ink md:flex-row">
+      {/* Mobile: collapsible top bar. <details> keeps it zero-JS. */}
+      <details className="group border-b border-line bg-surface/80 backdrop-blur-sm md:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between p-4">
+          <Image
+            src="/buzco-logo.gif"
+            alt="Buzco"
+            width={96}
+            height={54}
+            priority
+            unoptimized
+            className="h-8 w-auto"
+          />
+          <span className="label-caps text-ink/70 group-open:hidden">Menu</span>
+          <span className="label-caps hidden text-ink/70 group-open:inline">Close</span>
+        </summary>
+        <nav className="grid grid-cols-2 gap-1 px-4 pb-4">
+          {NAV.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="label-caps rounded-md px-2 py-2 text-ink/70 hover:bg-ink/10 hover:text-ink"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3">
+          <ThemeToggle />
+          <p className="truncate text-xs text-ink/50">{user?.email}</p>
+          <form action={signOut}>
+            <button type="submit" className="label-caps text-ink/70 hover:text-ink">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </details>
+
+      <aside className="hidden w-56 flex-col justify-between border-r border-line bg-surface/80 p-6 backdrop-blur-sm md:flex">
         <div>
           <div className="mb-8">
             <Image
@@ -61,7 +101,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </form>
         </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+
+      <main className="flex-1 p-4 md:p-8">{children}</main>
     </div>
   );
 }

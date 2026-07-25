@@ -32,6 +32,13 @@ export function SyncButton({ disabled }: { disabled?: boolean }) {
             Cost-of-goods set: {state.result.cogsUpdated} · Inventory reconciled:{" "}
             {state.result.inventoryReconciled}
           </p>
+          {/* A skipped reconciliation must never be silent — it's the difference
+              between accurate stock and quietly inflated stock. */}
+          {state.result.inventorySkippedReason && (
+            <p className="rounded-md border border-status-ordered/60 p-2 text-status-ordered">
+              Inventory not reconciled: {state.result.inventorySkippedReason}
+            </p>
+          )}
           {state.result.errors.length > 0 && (
             <div className="text-status-cancelled">
               <p>{state.result.errors.length} row(s) skipped:</p>
