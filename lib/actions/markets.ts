@@ -9,11 +9,8 @@ import { setTicketClaimed } from "@/lib/notion/raffle";
 import { pullPosSalesForEvent } from "@/lib/shopify/pos";
 import { cancelMarketOrder } from "@/lib/shopify/create-order";
 import { recordMarketSale } from "@/lib/market/record-sale";
-import {
-  recordRaffleSale,
-  type RaffleBundleId,
-  type RafflePaymentId,
-} from "@/lib/market/raffle-sales";
+import { recordRaffleTickets } from "@/lib/market/raffle-sales";
+import type { RafflePaymentId } from "@/lib/market/raffle-options";
 
 function refreshEvent(eventId: string) {
   revalidatePath(`/markets/${eventId}`);
@@ -368,12 +365,12 @@ export async function retryNotionSync(eventId: string): Promise<SyncState> {
 /** Quick-add a rifa sale from the dashboard's Raffle tab. */
 export async function sellRaffleBundle(
   eventId: string,
-  bundleId: RaffleBundleId,
+  tickets: number,
   paymentId: RafflePaymentId,
 ): Promise<SyncState> {
   try {
     const supabase = await createClient();
-    const result = await recordRaffleSale(supabase, { eventId, bundleId, paymentId });
+    const result = await recordRaffleTickets(supabase, { eventId, tickets, paymentId });
     refreshEvent(eventId);
     return {
       message: `+${result.tickets} rifa${result.tickets === 1 ? "" : "s"} · €${result.amount}${

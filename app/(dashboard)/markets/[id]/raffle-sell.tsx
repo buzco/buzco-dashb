@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { sellRaffleBundle, type SyncState } from "@/lib/actions/markets";
 import {
-  RAFFLE_BUNDLES,
   RAFFLE_PAYMENTS,
-  type RaffleBundleId,
+  freeUpgradeHint,
+  packsForTickets,
   type RafflePaymentId,
 } from "@/lib/market/raffle-options";
 
@@ -19,22 +19,27 @@ export function RaffleSell({
   eventId: string;
   totals: { tickets: number; revenue: number };
 }) {
-  const [bundle, setBundle] = useState<RaffleBundleId>("1");
+  const [tickets, setTickets] = useState(1);
   const [state, setState] = useState<SyncState | undefined>();
   const [pending, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useState(totals);
 
+  // Bundles are derived from the count — the dashboard shouldn't make you do
+  // arithmetic the stall screen already does for you.
+  const quote = packsForTickets(tickets);
+  const upgrade = freeUpgradeHint(tickets);
+
   const sell = (paymentId: RafflePaymentId) => {
-    const chosen = RAFFLE_BUNDLES.find((b) => b.id === bundle)!;
     setState(undefined);
     startTransition(async () => {
-      const result = await sellRaffleBundle(eventId, bundle, paymentId);
+      const result = await sellRaffleBundle(eventId, tickets, paymentId);
       setState(result);
       if (!result.error) {
         setOptimistic((t) => ({
-          tickets: t.tickets + chosen.tickets,
-          revenue: t.revenue + chosen.price,
+          tickets: t.tickets + quote.tickets,
+          revenue: t.revenue + quote.total,
         }));
+        setTickets(1);
       }
     });
   };
@@ -49,26 +54,40 @@ export function RaffleSell({
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        {RAFFLE_BUNDLES.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            onClick={() => setBundle(b.id)}
-            aria-pressed={bundle === b.id}
-            className={`rounded-lg border px-2 py-3 text-center ${
-              bundle === b.id ? "border-ink bg-ink/10" : "border-line hover:border-ink/50"
-            }`}
-          >
-            <span
-              className={`block font-mono text-xl tabular-nums ${bundle === b.id ? "text-ink" : "text-bone"}`}
-            >
-              {b.tickets}
-            </span>
-            <span className="label-caps text-ink/50">€{b.price}</span>
-          </button>
-        ))}
+      <div className="flex items-stretch gap-2">
+        <button
+          type="button"
+          onClick={() => setTickets((n) => Math.max(1, n - 1))}
+          className="w-12 rounded-lg border border-line text-xl text-ink hover:border-ink/60"
+          aria-label="One fewer rifa"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          min={1}
+          inputMode="numeric"
+          value={tickets}
+          onChange={(e) => setTickets(Math.max(1, Math.trunc(Number(e.target.value) || 1)))}
+          className="w-full rounded-lg border border-line bg-surface py-3 text-center font-mono text-2xl tabular-nums text-bone outline-none focus:border-ink"
+        />
+        <button
+          type="button"
+          onClick={() => setTickets((n) => n + 1)}
+          className="w-12 rounded-lg border border-line text-xl text-ink hover:border-ink/60"
+          aria-label="One more rifa"
+        >
+          +
+        </button>
       </div>
+
+      <p className="text-sm text-ink/60">
+        {quote.packs.map((p) => `${p.count}× ${p.bundle.label}`).join("  +  ")} ={" "}
+        <span className="font-mono tabular-nums text-ink">€{quote.total.toFixed(2)}</span>
+        {upgrade && (
+          <span className="ml-2 text-status-ordered">({upgrade.to} costs the same)</span>
+        )}
+      </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {RAFFLE_PAYMENTS.map((p) => (

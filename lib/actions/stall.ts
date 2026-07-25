@@ -4,11 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidLinkToken } from "@/lib/market/link";
 import { recordMarketSale } from "@/lib/market/record-sale";
-import {
-  recordRaffleSale,
-  type RaffleBundleId,
-  type RafflePaymentId,
-} from "@/lib/market/raffle-sales";
+import { recordRaffleTickets } from "@/lib/market/raffle-sales";
+import type { RafflePaymentId } from "@/lib/market/raffle-options";
 
 // Server actions for the tokenless stall pages.
 //
@@ -63,14 +60,14 @@ export async function stallSell(
 export async function stallRaffleSale(
   token: string,
   eventId: string,
-  bundleId: RaffleBundleId,
+  tickets: number,
   paymentId: RafflePaymentId,
 ): Promise<StallState> {
   if (!isValidLinkToken(token)) return { error: "This link is no longer valid.", at: Date.now() };
 
   try {
     const supabase = createAdminClient();
-    const result = await recordRaffleSale(supabase, { eventId, bundleId, paymentId });
+    const result = await recordRaffleTickets(supabase, { eventId, tickets, paymentId });
     revalidatePath(`/s/${token}/rifas`);
     return {
       ok: true,

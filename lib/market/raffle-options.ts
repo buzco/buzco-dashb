@@ -40,3 +40,51 @@ export const ALL_RAFFLE_PAYMENTS = [...RAFFLE_PAYMENTS, ...STALL_PAYMENTS];
 
 export type RaffleBundleId = (typeof RAFFLE_BUNDLES)[number]["id"];
 export type RafflePaymentId = (typeof ALL_RAFFLE_PAYMENTS)[number]["id"];
+
+export type RaffleBundle = (typeof RAFFLE_BUNDLES)[number];
+export type RafflePack = { bundle: RaffleBundle; count: number };
+
+/**
+ * Break a ticket count into bundles, largest first.
+ *
+ * Greedy is genuinely cheapest here rather than merely convenient: a 6-pack
+ * (€5) always beats six singles (€6), and a 12-pack is exactly two 6-packs in
+ * both tickets and price — so there is no count where taking a smaller bundle
+ * first would come out cheaper.
+ */
+export function packsForTickets(tickets: number): {
+  tickets: number;
+  packs: RafflePack[];
+  total: number;
+} {
+  const n = Math.max(0, Math.trunc(tickets));
+  const largestFirst = [...RAFFLE_BUNDLES].sort((a, b) => b.tickets - a.tickets);
+
+  const packs: RafflePack[] = [];
+  let left = n;
+  let total = 0;
+  for (const bundle of largestFirst) {
+    const count = Math.floor(left / bundle.tickets);
+    if (count <= 0) continue;
+    packs.push({ bundle, count });
+    left -= count * bundle.tickets;
+    total += count * bundle.price;
+  }
+  return { tickets: n, packs, total };
+}
+
+/**
+ * How many more tickets would cost nothing extra. Five singles cost €5, the
+ * same as a 6-pack — worth telling the seller so they can offer the extra one
+ * instead of the buyer overpaying per ticket.
+ */
+export function freeUpgradeHint(tickets: number): { extra: number; to: number } | null {
+  const here = packsForTickets(tickets);
+  for (let extra = 1; extra <= 6; extra++) {
+    const bigger = packsForTickets(tickets + extra);
+    if (bigger.total <= here.total && bigger.tickets > here.tickets) {
+      return { extra, to: bigger.tickets };
+    }
+  }
+  return null;
+}
