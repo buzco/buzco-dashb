@@ -184,8 +184,13 @@ export async function pullPosSalesForEvent(marketEventId: string): Promise<PosPu
       if (created < windowStart || created > windowEnd) continue;
 
       result.posOrders++;
-      const payment = paymentLabel(order.paymentGatewayNames, order.sourceName);
+      const gateway = paymentLabel(order.paymentGatewayNames, order.sourceName);
       const paid = (order.displayFinancialStatus ?? "").toUpperCase() === "PAID";
+      // The Notion mirror derives its Status (Pago / Por pagar) from
+      // payment_method, so an unpaid order has to say so here — POS genuinely
+      // does produce PENDING orders (#1064 was one). The gateway is still
+      // recorded in the note below, so nothing is lost.
+      const payment = paid ? gateway : "Unpaid";
 
       for (const { node: line } of order.lineItems.edges) {
         try {
@@ -215,7 +220,8 @@ export async function pullPosSalesForEvent(marketEventId: string): Promise<PosPu
             p_discount_amount: Math.max(0, original - discounted),
             p_fees_amount: 0,
             p_customer_ref: order.name,
-            p_notes: `Shopify POS ${order.name} · ${payment}${paid ? "" : " · unpaid"}`,
+            p_notes: `Shopify POS ${order.name} · ${gateway}${paid ? "" : " · unpaid"}`,
+            p_payment_method: payment,
             p_shopify_order_id: order.id,
             p_shopify_line_item_id: line.id,
             p_sold_at: order.createdAt,

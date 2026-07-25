@@ -53,6 +53,16 @@ function statusFor(sale: SaleRow): string {
   return "Pago";
 }
 
+/**
+ * "Unpaid" is an internal marker (see lib/shopify/pos.ts) that drives the Status
+ * column, not a payment method. Their tracker already has "N/A" for "no method
+ * yet", so use that and leave the curated option list alone.
+ */
+function paymentFor(sale: SaleRow): string | null {
+  if ((sale.payment_method ?? "").toLowerCase() === "unpaid") return "N/A";
+  return sale.payment_method;
+}
+
 function toNotionItem(sale: SaleRow): NotionSaleItem {
   const qty = Math.max(1, sale.quantity);
   const net = Number(sale.gross_amount) - Number(sale.discount_amount);
@@ -66,7 +76,7 @@ function toNotionItem(sale: SaleRow): NotionSaleItem {
     unitPrice: Math.round((net / qty) * 100) / 100,
     quantity: qty,
     status: statusFor(sale),
-    paymentMethod: sale.payment_method,
+    paymentMethod: paymentFor(sale),
     // Matches how the tracker is filled in by hand: who/where, not what.
     title: [sale.customer_ref, marketName].filter(Boolean).join(" · ") || "Market sale",
     soldAt: sale.sold_at,
