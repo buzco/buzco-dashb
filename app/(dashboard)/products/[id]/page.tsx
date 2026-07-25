@@ -7,6 +7,7 @@ import { Table, Th, Td } from "@/components/ui/table";
 import { Label, Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ShopifyMark } from "@/components/ui/shopify-mark";
+import { PushToShopify } from "./push-to-shopify";
 
 export default async function ProductDetailPage({
   params,
@@ -47,6 +48,10 @@ export default async function ProductDetailPage({
           <Badge status={product.status} />
         </div>
       </div>
+
+      {!product.shopify_product_id && (
+        <PushToShopify productId={product.id} />
+      )}
 
       <div className="space-y-3">
         <h2 className="label-caps text-ink/60">Variants</h2>
