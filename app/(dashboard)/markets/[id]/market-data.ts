@@ -262,5 +262,5 @@ function bySizeThenSku(a: MarketVariantView, b: MarketVariantView): number {
   if (ai !== -1 && bi !== -1 && ai !== bi) return ai - bi;
   if (ai !== -1 && bi === -1) return -1;
   if (ai === -1 && bi !== -1) return 1;
-  return (a.size ?? a.sku).localeCompare(b.size ?? b.sku);
+  return (a.size ?? a.color ?? a.sku).localeCompare(b.size ?? b.color ?? b.sku);
 }

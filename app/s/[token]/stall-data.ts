@@ -10,6 +10,7 @@ import { SIZE_RUN } from "@/lib/sizes";
 export type StallVariant = {
   variantId: string;
   size: string | null;
+  color: string | null;
   sku: string;
   available: number;
   price: number | null;
@@ -34,7 +35,7 @@ function bySize(a: StallVariant, b: StallVariant): number {
   if (ai !== -1 && bi !== -1) return ai - bi;
   if (ai !== -1) return -1;
   if (bi !== -1) return 1;
-  return (a.size ?? a.sku).localeCompare(b.size ?? b.sku);
+  return (a.size ?? a.color ?? a.sku).localeCompare(b.size ?? b.color ?? b.sku);
 }
 
 /** The event a helper should be selling into: the live one, else the newest open one. */
@@ -89,7 +90,7 @@ export async function loadStallCatalog(eventId: string): Promise<StallProduct[]>
 
   const { data: variants } = await supabase
     .from("variants")
-    .select("id, product_id, size, sku, retail_price")
+    .select("id, product_id, size, color, sku, retail_price")
     .in("id", [...qtyByVariant.keys()]);
 
   const productIds = [...new Set((variants ?? []).map((v) => v.product_id))];
@@ -125,7 +126,7 @@ export async function loadStallCatalog(eventId: string): Promise<StallProduct[]>
     const price = variantOverride.get(v.id) ?? productOverride.get(v.product_id) ?? retail;
     const available = qtyByVariant.get(v.id) ?? 0;
 
-    entry.variants.push({ variantId: v.id, size: v.size, sku: v.sku, available, price });
+    entry.variants.push({ variantId: v.id, size: v.size, color: v.color, sku: v.sku, available, price });
     entry.available += available;
     if (retail != null) entry.retailPrice = Math.max(entry.retailPrice ?? 0, retail);
   }

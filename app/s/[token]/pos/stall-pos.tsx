@@ -121,7 +121,7 @@ export function StallPos({
                       onClick={() => setPicked({ product, variant: v })}
                       className={`label-caps min-w-11 rounded-md border px-2 py-2 tabular-nums ${chipTone(v.available)}`}
                     >
-                      {v.size ?? v.sku}
+                      {v.size ?? v.color ?? v.sku}
                       <span className="ml-1 font-mono text-[0.7rem] opacity-70">{v.available}</span>
                     </button>
                   ))}
@@ -212,7 +212,7 @@ function SellSheet({
         <div>
           <p className="font-medium text-bone">{product.name}</p>
           <p className="label-caps text-ink/50">
-            {variant.size ?? variant.sku} · {variant.available} left
+            {variant.size ?? variant.color ?? variant.sku} · {variant.available} left
           </p>
         </div>
         <button type="button" onClick={onClose} className="label-caps text-ink/60">
