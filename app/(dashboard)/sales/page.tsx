@@ -20,7 +20,7 @@ export default async function SalesPage() {
     supabase.from("inventory_locations").select("id, name, type").order("name"),
     supabase
       .from("sales")
-      .select("id, channel, variant_id, quantity, gross_amount, net_amount, customer_ref, sold_at, raffle_bundle")
+      .select("id, channel, variant_id, quantity, gross_amount, net_amount, customer_ref, sold_at, notes")
       .order("sold_at", { ascending: false })
       .limit(50),
   ]);
@@ -82,7 +82,7 @@ export default async function SalesPage() {
                     <Td className="label-caps">{s.channel.replace(/_/g, " ")}</Td>
                     {/* Raffle rows have no variant — show what was actually sold. */}
                     <Td className="text-bone">
-                      {v ? variantLabel(v) : (s.raffle_bundle ?? s.customer_ref ?? "—")}
+                      {v ? variantLabel(v) : (s.notes ?? s.customer_ref ?? "—")}
                     </Td>
                     <Td className="text-right font-mono tabular-nums">{s.quantity}</Td>
                     <Td className="text-right font-mono tabular-nums">€{s.gross_amount}</Td>

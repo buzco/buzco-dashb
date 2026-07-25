@@ -99,7 +99,7 @@ export async function recordMarketSale(
   const locationId = await shopifyLocationId(supabase);
   const gross = Math.round(unitPrice * quantity * 100) / 100;
 
-  const { data: sale, error } = await supabase.rpc("log_market_sale", {
+  const args = {
     p_market_event_id: eventId,
     p_variant_id: variantId,
     p_quantity: quantity,
@@ -110,8 +110,26 @@ export async function recordMarketSale(
     p_notes: input.notes ?? null,
     p_payment_method: input.paymentMethod,
     p_shopify_order_id: shopifyOrderId,
+  };
+
+  let { data: sale, error } = await supabase.rpc("log_market_sale", {
+    ...args,
     p_location_id: locationId,
   });
+
+  // PGRST202 = no function with that signature. Migration 008 adds
+  // p_location_id; until it is applied the older 12-argument version is all
+  // that exists, so fall back to it rather than failing the sale. The only
+  // difference is which location the ledger deducts from — the sale, the
+  // Shopify order and the Notion row are identical either way.
+  if (error?.code === "PGRST202") {
+    ({ data: sale, error } = await supabase.rpc("log_market_sale", args));
+    if (!error) {
+      warning ??=
+        "Recorded against the event crate — apply migration 008 so stock comes off the Shopify pool.";
+    }
+  }
+
   if (error) throw new Error(error.message);
   if (!sale) throw new Error("Sale was not recorded");
 

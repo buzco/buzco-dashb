@@ -9,8 +9,10 @@
 -- location to mirror Shopify's decrement, or omit it to keep the old crate
 -- behaviour (still used by anyone who genuinely reserves stock per event).
 --
--- Raffle income has no variant and no stock movement, so it is recorded as a
--- plain sales row instead of through this function.
+-- This migration is an IMPROVEMENT, not a prerequisite. The app detects the
+-- older 12-argument signature (PGRST202) and falls back to it, so everything
+-- keeps working until this is applied — the only difference is which location
+-- the ledger deducts from.
 
 create or replace function log_market_sale(
   p_market_event_id      uuid,
@@ -113,12 +115,10 @@ $$;
 grant execute on function log_market_sale(uuid, uuid, integer, numeric, numeric, numeric, text, text, text, text, text, timestamptz, uuid) to authenticated;
 grant execute on function log_market_sale(uuid, uuid, integer, numeric, numeric, numeric, text, text, text, text, text, timestamptz, uuid) to service_role;
 
--- Raffle ticket sales: money in, but no product and no stock movement. Kept in
--- `sales` (variant_id null, channel 'other') so raffle income shows up in the
--- Finance tab and the event's takings next to garment sales.
-alter table sales add column if not exists raffle_bundle text;
-create index if not exists sales_raffle_bundle_idx on sales (raffle_bundle)
-  where raffle_bundle is not null;
+-- Raffle ticket sales are money in with no product and no stock movement. They
+-- are plain `sales` rows (variant_id null, channel 'other', tagged to the
+-- event), which needs no schema change — identifying them by channel avoids a
+-- column the app would otherwise have to depend on.
 
 -- The standalone POS/raffle links have no logged-in user, so their writes go
 -- through the service role. It bypasses RLS, but grant execute explicitly for

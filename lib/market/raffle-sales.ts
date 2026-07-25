@@ -66,7 +66,6 @@ export async function recordRaffleSale(
       quantity: bundle.tickets,
       gross_amount: bundle.price,
       payment_method: payment.notionOption,
-      raffle_bundle: bundle.notionOption,
       customer_ref: `Rifas · ${event.name}`,
       notes: `${bundle.label} · ${payment.notionOption}`,
     })
@@ -119,7 +118,8 @@ export async function raffleTotalsForEvent(
     .from("sales")
     .select("quantity, gross_amount")
     .eq("market_event_id", eventId)
-    .not("raffle_bundle", "is", null);
+    // Rifas are the only channel=other rows attached to an event.
+    .eq("channel", "other");
 
   return {
     tickets: (data ?? []).reduce((sum, r) => sum + r.quantity, 0),

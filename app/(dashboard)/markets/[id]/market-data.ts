@@ -115,7 +115,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
       supabase
         .from("sales")
         .select(
-          "id, variant_id, quantity, gross_amount, net_amount, sold_at, customer_ref, payment_method, notes, shopify_order_id, notion_page_id, notion_error, raffle_bundle",
+          "id, variant_id, quantity, gross_amount, net_amount, sold_at, customer_ref, payment_method, notes, shopify_order_id, notion_page_id, notion_error",
         )
         .eq("market_event_id", eventId)
         .order("sold_at", { ascending: false }),
@@ -224,7 +224,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
       notionError: s.notion_error,
       productName: v
         ? (productById.get(v.product_id)?.name ?? "Unknown")
-        : (s.raffle_bundle ?? "Unknown"),
+        : (s.notes ?? "Rifas"),
       size: v?.size ?? null,
       sku: v?.sku ?? "—",
     };

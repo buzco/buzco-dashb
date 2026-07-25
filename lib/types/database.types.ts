@@ -399,8 +399,7 @@ export interface Database {
           net_amount: number;
           shopify_order_id: string | null;
           shopify_line_item_id: string | null;
-          payment_method: string | null;
-          raffle_bundle: string | null;
+          payment_method: string | null;
           market_event_id: string | null;
           notion_page_id: string | null;
           notion_synced_at: string | null;
@@ -420,8 +419,7 @@ export interface Database {
           fees_amount?: number;
           shopify_order_id?: string | null;
           shopify_line_item_id?: string | null;
-          payment_method?: string | null;
-          raffle_bundle?: string | null;
+          payment_method?: string | null;
           market_event_id?: string | null;
           notion_page_id?: string | null;
           notion_synced_at?: string | null;
@@ -441,8 +439,7 @@ export interface Database {
           fees_amount?: number;
           shopify_order_id?: string | null;
           shopify_line_item_id?: string | null;
-          payment_method?: string | null;
-          raffle_bundle?: string | null;
+          payment_method?: string | null;
           market_event_id?: string | null;
           notion_page_id?: string | null;
           notion_synced_at?: string | null;
