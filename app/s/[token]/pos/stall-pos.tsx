@@ -262,7 +262,7 @@ function SellSheet({
           {/* Two buttons, not the tracker's full option list: a helper has no
               way to know whose Revolut or which brand's cash it is, and a wrong
               guess is worse than reconciling it later in the dashboard. */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {STALL_PAYMENTS.map((m) => (
               <button
                 key={m.id}

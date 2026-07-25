@@ -30,7 +30,11 @@ export const RAFFLE_PAYMENTS = [
  * no wrong answers. Reconciling to a person happens later in the dashboard.
  */
 export const STALL_PAYMENTS = [
-  { id: "cash", notionOption: "Cash", label: "Cash" },
+  // Cash is split by brand because notes go straight into one till or the
+  // other and can't be reconciled afterwards from a bank record, unlike
+  // Revolut and MBWAY which leave a trail.
+  { id: "cash-buzco", notionOption: "Cash Buzco", label: "Cash Buzco" },
+  { id: "cash-trying2", notionOption: "Cash Trying2", label: "Cash Trying2" },
   { id: "revolut", notionOption: "Revolut", label: "Revolut" },
   { id: "mbway", notionOption: "MBWAY", label: "MBWAY" },
 ] as const;

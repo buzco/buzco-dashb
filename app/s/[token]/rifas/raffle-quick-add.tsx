@@ -127,7 +127,7 @@ export function RaffleQuickAdd({
       {!upgrade && <div className="mb-6" />}
 
       <p className="label-caps mb-2 text-ink/60">2 · Pago com</p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {STALL_PAYMENTS.map((p) => (
           <button
             key={p.id}
