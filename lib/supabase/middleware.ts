@@ -23,6 +23,14 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // The standalone stall links (/s/<token>/…) are handed to helpers who have no
+  // dashboard account, so they must skip the login redirect. They are guarded
+  // instead by the unguessable token in the path, checked in lib/market/link.ts
+  // — the redirect below would otherwise bounce them to a login they can't pass.
+  if (request.nextUrl.pathname.startsWith("/s/")) {
+    return supabaseResponse;
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");

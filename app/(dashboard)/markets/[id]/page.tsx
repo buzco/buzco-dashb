@@ -5,6 +5,7 @@ import { setMarketStatus } from "@/lib/actions/markets";
 import { hasRaffleDb, isNotionConfigured } from "@/lib/notion/client";
 import { getRaffleTickets, type RaffleTicket } from "@/lib/notion/raffle";
 import { getPaymentMethodOptions } from "@/lib/notion/sales";
+import { raffleTotalsForEvent } from "@/lib/market/raffle-sales";
 import { loadMarketData } from "./market-data";
 import { StockGrid } from "./stock-grid";
 import { LoadPanel, type VariantOption } from "./load-panel";
@@ -55,7 +56,11 @@ export default async function MarketEventPage({
   // Raffle-tab-only: the Notion prize register.
   let raffleTickets: RaffleTicket[] = [];
   let raffleError: string | null = null;
+  let raffleTotals = { tickets: 0, revenue: 0 };
   if (tab === "raffle") {
+    const supabase = await createClient();
+    const t = await raffleTotalsForEvent(supabase, id);
+    raffleTotals = { tickets: t.tickets, revenue: t.revenue };
     if (!hasRaffleDb()) {
       raffleError = "Notion raffle database isn't configured yet.";
     } else {
@@ -167,7 +172,12 @@ export default async function MarketEventPage({
         />
       )}
       {tab === "raffle" && (
-        <RafflePanel eventId={event.id} tickets={raffleTickets} error={raffleError} />
+        <RafflePanel
+          eventId={event.id}
+          tickets={raffleTickets}
+          error={raffleError}
+          raffleTotals={raffleTotals}
+        />
       )}
     </div>
   );

@@ -17,6 +17,9 @@ export type MirrorResult = {
   errors: string[];
 };
 
+/** Either the request-scoped client or the service-role one. */
+type SupabaseLike = Awaited<ReturnType<typeof createClient>>;
+
 type SaleRow = {
   id: string;
   quantity: number;
@@ -83,11 +86,18 @@ function toNotionItem(sale: SaleRow): NotionSaleItem {
   };
 }
 
-export async function mirrorSalesToNotion(saleIds: string[]): Promise<MirrorResult> {
+/**
+ * @param client Pass the service-role client when there is no logged-in user
+ *   (the standalone POS/raffle links); otherwise the request-scoped one is used.
+ */
+export async function mirrorSalesToNotion(
+  saleIds: string[],
+  client?: SupabaseLike,
+): Promise<MirrorResult> {
   const result: MirrorResult = { synced: 0, failed: 0, errors: [] };
   if (!saleIds.length) return result;
 
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const { data, error } = await supabase.from("sales").select(SALE_SELECT).in("id", saleIds);
   if (error) return { synced: 0, failed: saleIds.length, errors: [error.message] };
 
@@ -123,8 +133,11 @@ export async function mirrorSalesToNotion(saleIds: string[]): Promise<MirrorResu
 }
 
 /** Retries every market sale for an event that has no Notion page yet. */
-export async function mirrorUnsyncedForEvent(marketEventId: string): Promise<MirrorResult> {
-  const supabase = await createClient();
+export async function mirrorUnsyncedForEvent(
+  marketEventId: string,
+  client?: SupabaseLike,
+): Promise<MirrorResult> {
+  const supabase = client ?? (await createClient());
   const { data, error } = await supabase
     .from("sales")
     .select("id")
@@ -132,5 +145,5 @@ export async function mirrorUnsyncedForEvent(marketEventId: string): Promise<Mir
     .is("notion_page_id", null);
 
   if (error) return { synced: 0, failed: 0, errors: [error.message] };
-  return mirrorSalesToNotion((data ?? []).map((s) => s.id));
+  return mirrorSalesToNotion((data ?? []).map((s) => s.id), client);
 }

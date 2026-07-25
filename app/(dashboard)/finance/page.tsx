@@ -34,7 +34,8 @@ export default async function FinancePage() {
   for (const s of sales ?? []) {
     netRevenue += Number(s.net_amount ?? 0);
     unitsSold += s.quantity;
-    cogs += (costByVariant.get(s.variant_id) ?? 0) * s.quantity;
+    // Raffle tickets have no variant and therefore no cost of goods.
+    cogs += (s.variant_id ? (costByVariant.get(s.variant_id) ?? 0) : 0) * s.quantity;
     const ch = revenueByChannel.get(s.channel) ?? { net: 0, units: 0 };
     ch.net += Number(s.net_amount ?? 0);
     ch.units += s.quantity;

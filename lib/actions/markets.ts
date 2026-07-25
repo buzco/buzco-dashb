@@ -7,6 +7,13 @@ import { archivePage, isNotionConfigured } from "@/lib/notion/client";
 import { mirrorSalesToNotion, mirrorUnsyncedForEvent } from "@/lib/notion/mirror";
 import { setTicketClaimed } from "@/lib/notion/raffle";
 import { pullPosSalesForEvent } from "@/lib/shopify/pos";
+import { cancelMarketOrder } from "@/lib/shopify/create-order";
+import { recordMarketSale } from "@/lib/market/record-sale";
+import {
+  recordRaffleSale,
+  type RaffleBundleId,
+  type RafflePaymentId,
+} from "@/lib/market/raffle-sales";
 
 function refreshEvent(eventId: string) {
   revalidatePath(`/markets/${eventId}`);
@@ -244,38 +251,40 @@ export async function sellAtMarket(eventId: string, formData: FormData) {
   if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("Quantity must be a whole number above zero");
 
   const unitPrice = priceRaw ? Number(priceRaw.replace(",", ".")) : 0;
-  if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("Enter a valid price");
 
+  // Same path as the standalone POS link: Shopify order first (it owns stock),
+  // then our ledger, then the Notion mirror.
   const supabase = await createClient();
-  const { data: sale, error } = await supabase.rpc("log_market_sale", {
-    p_market_event_id: eventId,
-    p_variant_id: variant_id,
-    p_quantity: quantity,
-    p_gross_amount: Math.round(unitPrice * quantity * 100) / 100,
-    p_discount_amount: 0,
-    p_fees_amount: 0,
-    p_customer_ref: customer_ref,
-    p_notes: notes,
-    p_payment_method: payment_method,
+  await recordMarketSale(supabase, {
+    eventId,
+    variantId: variant_id,
+    quantity,
+    unitPrice,
+    paymentMethod: payment_method,
+    customerRef: customer_ref,
+    notes,
   });
-  if (error) throw new Error(error.message);
-
-  // Notion is a mirror: a failure here must not undo the sale.
-  if (sale && isNotionConfigured()) {
-    await mirrorSalesToNotion([sale.id]);
-  }
   refreshEvent(eventId);
 }
 
 export async function voidSale(eventId: string, saleId: string) {
   const supabase = await createClient();
 
-  // Grab the mirrored page ids before the row goes away.
+  // Grab what we need before the row goes away.
   const { data: sale } = await supabase
     .from("sales")
-    .select("notion_page_id")
+    .select("notion_page_id, shopify_order_id, shopify_line_item_id")
     .eq("id", saleId)
     .maybeSingle();
+
+  // Cancel in Shopify FIRST, and let a failure abort the void: Shopify owns the
+  // stock, so removing our row while its order still stands would leave the
+  // unit sold in Shopify and back in our ledger. Only orders this app created
+  // are cancelled — an imported POS order belongs to the till, not to us.
+  const isOurOrder = sale?.shopify_order_id && !sale.shopify_line_item_id;
+  if (isOurOrder) {
+    await cancelMarketOrder(sale.shopify_order_id as string);
+  }
 
   const { error } = await supabase.rpc("void_market_sale", { p_sale_id: saleId });
   if (error) throw new Error(error.message);
@@ -355,6 +364,27 @@ export async function retryNotionSync(eventId: string): Promise<SyncState> {
 // ---------------------------------------------------------------------------
 // Raffle (lives entirely in Notion)
 // ---------------------------------------------------------------------------
+
+/** Quick-add a rifa sale from the dashboard's Raffle tab. */
+export async function sellRaffleBundle(
+  eventId: string,
+  bundleId: RaffleBundleId,
+  paymentId: RafflePaymentId,
+): Promise<SyncState> {
+  try {
+    const supabase = await createClient();
+    const result = await recordRaffleSale(supabase, { eventId, bundleId, paymentId });
+    refreshEvent(eventId);
+    return {
+      message: `+${result.tickets} rifa${result.tickets === 1 ? "" : "s"} · €${result.amount}${
+        result.notionOk ? " · Notion ✓" : " · not in Notion yet"
+      }`,
+      at: Date.now(),
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e), at: Date.now() };
+  }
+}
 
 export async function claimRaffleTicket(eventId: string, formData: FormData) {
   const pageId = (formData.get("page_id") as string) || "";

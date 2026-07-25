@@ -115,7 +115,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
       supabase
         .from("sales")
         .select(
-          "id, variant_id, quantity, gross_amount, net_amount, sold_at, customer_ref, payment_method, notes, shopify_order_id, notion_page_id, notion_error",
+          "id, variant_id, quantity, gross_amount, net_amount, sold_at, customer_ref, payment_method, notes, shopify_order_id, notion_page_id, notion_error, raffle_bundle",
         )
         .eq("market_event_id", eventId)
         .order("sold_at", { ascending: false }),
@@ -134,6 +134,8 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
   const crateByVariant = new Map((stock ?? []).map((s) => [s.variant_id, s.quantity]));
   const soldByVariant = new Map<string, number>();
   for (const s of saleRows ?? []) {
+    // Raffle ticket rows carry no variant — they're money, not garments.
+    if (!s.variant_id) continue;
     soldByVariant.set(s.variant_id, (soldByVariant.get(s.variant_id) ?? 0) + s.quantity);
   }
 
@@ -207,7 +209,7 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
 
   const variantById = new Map((variants ?? []).map((v) => [v.id, v]));
   const sales: MarketSaleView[] = (saleRows ?? []).map((s) => {
-    const v = variantById.get(s.variant_id);
+    const v = s.variant_id ? variantById.get(s.variant_id) : undefined;
     return {
       id: s.id,
       quantity: s.quantity,
@@ -220,7 +222,9 @@ export async function loadMarketData(eventId: string): Promise<MarketData | null
       shopifyOrderId: s.shopify_order_id,
       notionPageId: s.notion_page_id,
       notionError: s.notion_error,
-      productName: v ? (productById.get(v.product_id)?.name ?? "Unknown") : "Unknown",
+      productName: v
+        ? (productById.get(v.product_id)?.name ?? "Unknown")
+        : (s.raffle_bundle ?? "Unknown"),
       size: v?.size ?? null,
       sku: v?.sku ?? "—",
     };

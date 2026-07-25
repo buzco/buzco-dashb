@@ -20,7 +20,7 @@ export default async function SalesPage() {
     supabase.from("inventory_locations").select("id, name, type").order("name"),
     supabase
       .from("sales")
-      .select("id, channel, variant_id, quantity, gross_amount, net_amount, customer_ref, sold_at")
+      .select("id, channel, variant_id, quantity, gross_amount, net_amount, customer_ref, sold_at, raffle_bundle")
       .order("sold_at", { ascending: false })
       .limit(50),
   ]);
@@ -75,12 +75,15 @@ export default async function SalesPage() {
             </thead>
             <tbody>
               {sales.map((s) => {
-                const v = variantById.get(s.variant_id);
+                const v = s.variant_id ? variantById.get(s.variant_id) : undefined;
                 return (
                   <tr key={s.id}>
                     <Td className="text-ink/70">{new Date(s.sold_at).toLocaleDateString()}</Td>
                     <Td className="label-caps">{s.channel.replace(/_/g, " ")}</Td>
-                    <Td className="text-bone">{v ? variantLabel(v) : s.variant_id.slice(0, 8)}</Td>
+                    {/* Raffle rows have no variant — show what was actually sold. */}
+                    <Td className="text-bone">
+                      {v ? variantLabel(v) : (s.raffle_bundle ?? s.customer_ref ?? "—")}
+                    </Td>
                     <Td className="text-right font-mono tabular-nums">{s.quantity}</Td>
                     <Td className="text-right font-mono tabular-nums">€{s.gross_amount}</Td>
                     <Td className="text-right font-mono tabular-nums text-bone">€{s.net_amount}</Td>

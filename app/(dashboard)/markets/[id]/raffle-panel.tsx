@@ -1,6 +1,7 @@
 import { unclaimRaffleTicket } from "@/lib/actions/markets";
 import { groupByPrize, type RaffleTicket } from "@/lib/notion/raffle";
 import { RaffleTicketFinder } from "./raffle-finder";
+import { RaffleSell } from "./raffle-sell";
 
 // The raffle register stays in Notion — prizes are not products and never touch
 // the inventory ledger. This tab is a read view over that database plus the one
@@ -10,14 +11,18 @@ export function RafflePanel({
   eventId,
   tickets,
   error,
+  raffleTotals,
 }: {
   eventId: string;
   tickets: RaffleTicket[];
   error: string | null;
+  raffleTotals: { tickets: number; revenue: number };
 }) {
   if (error) {
+    // The prize register being unreachable must not stop rifas being sold.
     return (
-      <div className="space-y-2">
+      <div className="space-y-4">
+        <RaffleSell eventId={eventId} totals={raffleTotals} />
         <p className="text-sm text-status-cancelled">{error}</p>
         <p className="text-xs text-ink/50">
           Set <span className="font-mono">NOTION_RAFFLE_DB_ID</span> in{" "}
@@ -40,6 +45,8 @@ export function RafflePanel({
         <Stat label="Left to give" value={String(tickets.length - claimed.length)} />
         <Stat label="Prize value left" value={`€${remainingValue.toFixed(2)}`} accent />
       </div>
+
+      <RaffleSell eventId={eventId} totals={raffleTotals} />
 
       <RaffleTicketFinder eventId={eventId} tickets={tickets} />
 

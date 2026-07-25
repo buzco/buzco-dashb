@@ -389,7 +389,8 @@ export interface Database {
         Row: {
           id: string;
           channel: Database["public"]["Enums"]["sale_channel"];
-          variant_id: string;
+          // null for raffle ticket sales — money in, but no product
+          variant_id: string | null;
           quantity: number;
           gross_amount: number;
           discount_amount: number;
@@ -399,6 +400,7 @@ export interface Database {
           shopify_order_id: string | null;
           shopify_line_item_id: string | null;
           payment_method: string | null;
+          raffle_bundle: string | null;
           market_event_id: string | null;
           notion_page_id: string | null;
           notion_synced_at: string | null;
@@ -410,7 +412,7 @@ export interface Database {
         Insert: {
           id?: string;
           channel: Database["public"]["Enums"]["sale_channel"];
-          variant_id: string;
+          variant_id?: string | null;
           quantity?: number;
           gross_amount: number;
           discount_amount?: number;
@@ -419,6 +421,7 @@ export interface Database {
           shopify_order_id?: string | null;
           shopify_line_item_id?: string | null;
           payment_method?: string | null;
+          raffle_bundle?: string | null;
           market_event_id?: string | null;
           notion_page_id?: string | null;
           notion_synced_at?: string | null;
@@ -430,7 +433,7 @@ export interface Database {
         Update: {
           id?: string;
           channel?: Database["public"]["Enums"]["sale_channel"];
-          variant_id?: string;
+          variant_id?: string | null;
           quantity?: number;
           gross_amount?: number;
           discount_amount?: number;
@@ -439,6 +442,7 @@ export interface Database {
           shopify_order_id?: string | null;
           shopify_line_item_id?: string | null;
           payment_method?: string | null;
+          raffle_bundle?: string | null;
           market_event_id?: string | null;
           notion_page_id?: string | null;
           notion_synced_at?: string | null;
