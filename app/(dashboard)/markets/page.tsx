@@ -5,6 +5,7 @@ import { isNotionConfigured } from "@/lib/notion/client";
 import { describeSalesMapping } from "@/lib/notion/sales";
 import { Button } from "@/components/ui/button";
 import { Label, Input } from "@/components/ui/input";
+import { StallLinks } from "./stall-links";
 
 function statusTone(status: string): string {
   if (status === "live") return "border-status-active text-status-active";
@@ -110,6 +111,8 @@ export default async function MarketsPage() {
           })}
         </ul>
       )}
+
+      <StallLinks />
 
       <NotionMappingCheck />
 
