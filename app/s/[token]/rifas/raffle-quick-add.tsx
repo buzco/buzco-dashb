@@ -5,7 +5,7 @@ import Link from "next/link";
 import { stallRaffleSale, type StallState } from "@/lib/actions/stall";
 import {
   RAFFLE_BUNDLES,
-  RAFFLE_PAYMENTS,
+  STALL_PAYMENTS,
   type RaffleBundleId,
   type RafflePaymentId,
 } from "@/lib/market/raffle-options";
@@ -86,16 +86,15 @@ export function RaffleQuickAdd({
 
       <p className="label-caps mb-2 text-ink/60">2 · Pago com</p>
       <div className="grid grid-cols-2 gap-2">
-        {RAFFLE_PAYMENTS.map((p) => (
+        {STALL_PAYMENTS.map((p) => (
           <button
             key={p.id}
             type="button"
             disabled={pending}
             onClick={() => sell(p.id)}
-            className="rounded-lg border border-line bg-surface px-3 py-5 text-left transition-colors hover:border-pink disabled:opacity-50"
+            className="rounded-lg border border-line bg-surface px-3 py-8 transition-colors hover:border-pink disabled:opacity-50"
           >
-            <span className="block text-base font-medium text-bone">{p.label}</span>
-            <span className="label-caps text-ink/50">{p.brand}</span>
+            <span className="block text-center text-lg font-medium text-bone">{p.label}</span>
           </button>
         ))}
       </div>

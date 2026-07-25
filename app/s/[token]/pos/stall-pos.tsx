@@ -4,14 +4,13 @@ import { useActionState, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { stallSell, type StallState } from "@/lib/actions/stall";
+import { STALL_PAYMENTS } from "@/lib/market/raffle-options";
 import type { StallEvent, StallProduct, StallVariant } from "../stall-data";
 
 // Built for a friend holding a phone in one hand and a tee in the other:
 // big tap targets, no jargon, and a confirmation they can't miss. Every sale
 // pushes a real Shopify order, so stock stays right without anyone thinking
 // about inventory.
-
-const FALLBACK_PAYMENTS = ["Cash", "Shopify", "N/A"];
 
 function euro(n: number | null): string {
   return n == null ? "—" : `€${n.toFixed(2)}`;
@@ -28,13 +27,11 @@ export function StallPos({
   event,
   otherEvents,
   products,
-  paymentMethods,
 }: {
   token: string;
   event: StallEvent;
   otherEvents: StallEvent[];
   products: StallProduct[];
-  paymentMethods: string[];
 }) {
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<{ product: StallProduct; variant: StallVariant } | null>(
@@ -141,7 +138,6 @@ export function StallPos({
           eventId={event.id}
           product={picked.product}
           variant={picked.variant}
-          paymentMethods={paymentMethods}
           onClose={() => setPicked(null)}
         />
       )}
@@ -176,26 +172,15 @@ function SellSheet({
   eventId,
   product,
   variant,
-  paymentMethods,
   onClose,
 }: {
   token: string;
   eventId: string;
   product: StallProduct;
   variant: StallVariant;
-  paymentMethods: string[];
   onClose: () => void;
 }) {
-  const methods = useMemo(() => {
-    const source = paymentMethods.length ? paymentMethods : FALLBACK_PAYMENTS;
-    const seen = new Map<string, string>();
-    for (const m of source) {
-      const key = m.trim().toLowerCase();
-      if (!seen.has(key)) seen.set(key, m.trim());
-    }
-    return [...seen.values()];
-  }, [paymentMethods]);
-
+  const [payment, setPayment] = useState("");
   const [state, formAction, isPending] = useActionState<StallState | undefined, FormData>(
     stallSell.bind(null, token, eventId),
     undefined,
@@ -272,26 +257,29 @@ function SellSheet({
           </div>
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="payment_method" className="label-caps block text-ink/60">
-            Paid with
-          </label>
-          <select
-            id="payment_method"
-            name="payment_method"
-            required
-            defaultValue=""
-            className="w-full rounded-md border border-line bg-surface px-3 py-3 text-base text-bone outline-none focus:border-ink"
-          >
-            <option value="" disabled>
-              Pick how they paid…
-            </option>
-            {methods.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
+        <div className="space-y-1.5">
+          <span className="label-caps block text-ink/60">Paid with</span>
+          {/* Two buttons, not the tracker's full option list: a helper has no
+              way to know whose Revolut or which brand's cash it is, and a wrong
+              guess is worse than reconciling it later in the dashboard. */}
+          <div className="grid grid-cols-2 gap-2">
+            {STALL_PAYMENTS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setPayment(m.notionOption)}
+                aria-pressed={payment === m.notionOption}
+                className={`rounded-lg border px-3 py-5 text-lg font-medium transition-colors ${
+                  payment === m.notionOption
+                    ? "border-ink bg-ink/10 text-ink"
+                    : "border-line text-bone hover:border-ink/50"
+                }`}
+              >
+                {m.label}
+              </button>
             ))}
-          </select>
+          </div>
+          <input type="hidden" name="payment_method" value={payment} />
         </div>
 
         <div className="space-y-1">
@@ -309,10 +297,10 @@ function SellSheet({
 
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !payment}
           className="label-caps w-full rounded-md bg-pink px-4 py-4 text-base text-black disabled:opacity-50"
         >
-          {isPending ? "Recording…" : "Record sale"}
+          {isPending ? "Recording…" : payment ? "Record sale" : "Pick Cash or Revolut"}
         </button>
       </form>
     </Sheet>

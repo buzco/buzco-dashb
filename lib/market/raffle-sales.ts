@@ -4,13 +4,15 @@ import { createPage, getDatabase, isNotionConfigured } from "@/lib/notion/client
 import { buildProperties } from "@/lib/notion/props";
 import type { createClient } from "@/lib/supabase/server";
 import {
+  ALL_RAFFLE_PAYMENTS,
   RAFFLE_BUNDLES,
   RAFFLE_PAYMENTS,
+  STALL_PAYMENTS,
   type RaffleBundleId,
   type RafflePaymentId,
 } from "@/lib/market/raffle-options";
 
-export { RAFFLE_BUNDLES, RAFFLE_PAYMENTS };
+export { RAFFLE_BUNDLES, RAFFLE_PAYMENTS, STALL_PAYMENTS };
 export type { RaffleBundleId, RafflePaymentId };
 
 // Raffle ticket sales ("rifas"). These are money without a product: no variant,
@@ -44,7 +46,7 @@ export async function recordRaffleSale(
   opts: { eventId: string; bundleId: RaffleBundleId; paymentId: RafflePaymentId },
 ): Promise<RaffleSaleResult> {
   const bundle = RAFFLE_BUNDLES.find((b) => b.id === opts.bundleId);
-  const payment = RAFFLE_PAYMENTS.find((p) => p.id === opts.paymentId);
+  const payment = ALL_RAFFLE_PAYMENTS.find((p) => p.id === opts.paymentId);
   if (!bundle) throw new Error("Unknown raffle bundle");
   if (!payment) throw new Error("Unknown payment method");
 

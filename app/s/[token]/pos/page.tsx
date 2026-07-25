@@ -1,6 +1,4 @@
 import { assertLinkToken } from "@/lib/market/link";
-import { getPaymentMethodOptions } from "@/lib/notion/sales";
-import { isNotionConfigured } from "@/lib/notion/client";
 import { currentStallEvent, listOpenEvents, loadStallCatalog } from "../stall-data";
 import { StallPos } from "./stall-pos";
 
@@ -35,10 +33,9 @@ export default async function StallPosPage({
     );
   }
 
-  const [products, paymentMethods] = await Promise.all([
-    loadStallCatalog(event.id),
-    isNotionConfigured() ? getPaymentMethodOptions() : Promise.resolve([]),
-  ]);
+  // Payment is just Cash or Revolut here, so there is no Notion round-trip to
+  // make the stall screen wait on.
+  const products = await loadStallCatalog(event.id);
 
   return (
     <StallPos
@@ -46,7 +43,6 @@ export default async function StallPosPage({
       event={event}
       otherEvents={openEvents.filter((e) => e.id !== event.id)}
       products={products}
-      paymentMethods={paymentMethods}
     />
   );
 }

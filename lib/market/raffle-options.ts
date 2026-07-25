@@ -12,7 +12,11 @@ export const RAFFLE_BUNDLES = [
   { id: "12", notionOption: "12 rifas Bundle", label: "12 rifas", tickets: 12, price: 10 },
 ] as const;
 
-/** Payment options, matching the Notion `Pago com` select exactly. */
+/**
+ * Full payment options for the dashboard, matching the Notion `Pago com`
+ * select exactly. These name who took the money, which is how Buzco and
+ * Trying 2 split takings.
+ */
 export const RAFFLE_PAYMENTS = [
   { id: "dinheiro-buzco", notionOption: "Dinheiro Buzco", label: "Dinheiro", brand: "Buzco" },
   { id: "dinheiro-trying2", notionOption: "Dinheiro Trying 2", label: "Dinheiro", brand: "Trying 2" },
@@ -20,5 +24,18 @@ export const RAFFLE_PAYMENTS = [
   { id: "revolut-vasco", notionOption: "Revolut Vasco", label: "Revolut", brand: "Vasco" },
 ] as const;
 
+/**
+ * What the shared QR links offer. Helpers working the table shouldn't have to
+ * know whose Revolut it is or which brand the cash belongs to — two buttons,
+ * no wrong answers. Reconciling to a person happens later in the dashboard.
+ */
+export const STALL_PAYMENTS = [
+  { id: "cash", notionOption: "Cash", label: "Cash" },
+  { id: "revolut", notionOption: "Revolut", label: "Revolut" },
+] as const;
+
+/** Every option any surface can submit. */
+export const ALL_RAFFLE_PAYMENTS = [...RAFFLE_PAYMENTS, ...STALL_PAYMENTS];
+
 export type RaffleBundleId = (typeof RAFFLE_BUNDLES)[number]["id"];
-export type RafflePaymentId = (typeof RAFFLE_PAYMENTS)[number]["id"];
+export type RafflePaymentId = (typeof ALL_RAFFLE_PAYMENTS)[number]["id"];
