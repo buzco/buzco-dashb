@@ -118,15 +118,28 @@ export async function recordMarketSale(
   });
 
   // PGRST202 = no function with that signature. Migration 008 adds
-  // p_location_id; until it is applied the older 12-argument version is all
-  // that exists, so fall back to it rather than failing the sale. The only
-  // difference is which location the ledger deducts from — the sale, the
-  // Shopify order and the Notion row are identical either way.
+  // p_location_id; until it is applied only the 12-argument version exists, and
+  // that one can deduct solely from the event crate — which drives the crate
+  // negative, because with Shopify as the stock centre nothing is loaded there.
+  //
+  // So fall back, then move the movement onto the pool Shopify actually
+  // decremented. The end state is identical to having the migration, which is
+  // why this is silent: there is nothing for the seller to act on.
   if (error?.code === "PGRST202") {
     ({ data: sale, error } = await supabase.rpc("log_market_sale", args));
-    if (!error) {
-      warning ??=
-        "Recorded against the event crate — apply migration 008 so stock comes off the Shopify pool.";
+
+    if (!error && sale && locationId) {
+      const { error: moveError } = await supabase
+        .from("inventory_movements")
+        .update({ location_id: locationId })
+        .eq("reference_type", "sale")
+        .eq("reference_id", sale.id);
+
+      // Only worth mentioning if the correction itself failed, since that does
+      // leave a negative crate balance for someone to clean up.
+      if (moveError) {
+        warning ??= `Sale recorded, but the stock movement stayed on the event crate (${moveError.message}).`;
+      }
     }
   }
 
