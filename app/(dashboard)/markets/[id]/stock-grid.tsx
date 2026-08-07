@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { shopifyCdnResize } from "@/lib/shopify/image";
 import { useActionState } from "react";
 import { sellAtMarket } from "@/lib/actions/markets";
 import type { MarketProductView, MarketVariantView } from "./market-data";
@@ -145,7 +146,7 @@ function ProductCard({
       <div className="relative aspect-square w-full bg-ink/5">
         {product.imageUrl ? (
           <Image
-            src={product.imageUrl}
+            src={shopifyCdnResize(product.imageUrl)!}
             alt={product.name}
             fill
             sizes="(max-width:1024px) 50vw, 25vw"

@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import Image from "next/image";
+import { shopifyCdnResize } from "@/lib/shopify/image";
 import Link from "next/link";
 import { stallSell, type StallState } from "@/lib/actions/stall";
 import { STALL_PAYMENTS } from "@/lib/market/raffle-options";
@@ -97,7 +98,9 @@ export function StallPos({
               <div className="relative aspect-square w-full bg-ink/5">
                 {product.imageUrl ? (
                   <Image
-                    src={product.imageUrl}
+                    // Stall wifi is the worst network this app runs on — never
+                    // hand it a 6 MB original.
+                    src={shopifyCdnResize(product.imageUrl, 600)!}
                     alt={product.name}
                     fill
                     sizes="(max-width:640px) 50vw, 33vw"

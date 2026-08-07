@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import { shopifyCdnResize } from "@/lib/shopify/image";
 
 export type StockRow = {
   label: string;
@@ -23,22 +24,28 @@ export type CatalogProduct = {
 
 export function CatalogCard({ product }: { product: CatalogProduct }) {
   const [open, setOpen] = useState(false);
+  // Shopify files get deleted while our image_url still points at them, and a
+  // dead URL otherwise renders as the browser's broken-image glyph. Fall back to
+  // the same empty state a product with no image gets.
+  const [imageFailed, setImageFailed] = useState(false);
+  const src = imageFailed ? null : shopifyCdnResize(product.imageUrl);
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-surface">
       <Link href={`/products/${product.id}`} className="block">
         <div className="relative aspect-square w-full bg-ink/5">
-          {product.imageUrl ? (
+          {src ? (
             <Image
-              src={product.imageUrl}
+              src={src}
               alt={product.name}
               fill
               sizes="(max-width:768px) 50vw, 25vw"
               className="object-cover"
+              onError={() => setImageFailed(true)}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-ink/30">
-              <span className="label-caps">No image</span>
+              <span className="label-caps">{imageFailed ? "Image missing" : "No image"}</span>
             </div>
           )}
         </div>
