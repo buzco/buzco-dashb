@@ -1,14 +1,30 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Table, Th, Td } from "@/components/ui/table";
 
 const eur = (n: number) =>
   "€" + n.toLocaleString("en-IE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+// Each tile says where its number came from. This page does no bookkeeping of
+// its own — it only adds up rows other parts of the app wrote — so being able
+// to trace a figure back to its table is the difference between trusting it and
+// guessing.
+function Stat({
+  label,
+  value,
+  source,
+  accent,
+}: {
+  label: string;
+  value: string;
+  source: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="rounded-lg border border-line bg-surface p-5">
+    <div className="rounded-lg border border-line bg-surface/90 p-5 backdrop-blur-sm">
       <p className="label-caps text-ink/60">{label}</p>
       <p className={`mt-2 text-3xl font-bold tabular-nums ${accent ? "text-ink" : "text-bone"}`}>{value}</p>
+      <p className="mt-1 text-xs text-ink/40">{source}</p>
     </div>
   );
 }
@@ -34,7 +50,9 @@ export default async function FinancePage() {
   for (const s of sales ?? []) {
     netRevenue += Number(s.net_amount ?? 0);
     unitsSold += s.quantity;
-    // Raffle tickets have no variant and therefore no cost of goods.
+    // A missing production cost contributes nothing — which covers raffle
+    // tickets (genuinely costless) and any product whose cost was never entered
+    // (a data gap that quietly understates COGS). Both are called out below.
     cogs += (s.variant_id ? (costByVariant.get(s.variant_id) ?? 0) : 0) * s.quantity;
     const ch = revenueByChannel.get(s.channel) ?? { net: 0, units: 0 };
     ch.net += Number(s.net_amount ?? 0);
@@ -62,17 +80,29 @@ export default async function FinancePage() {
 
   return (
     <div className="space-y-10">
-      <h1 className="label-caps text-ink/60">Finance</h1>
+      <div>
+        <h1 className="label-caps text-ink/60">Finance</h1>
+        <p className="mt-2 max-w-2xl text-sm text-ink/50">
+          Everything here is summed live from four places: every row in{" "}
+          <span className="text-ink/80">sales</span> (logged at markets, imported from
+          Shopify orders, or entered by hand), every row in{" "}
+          <Link href="/expenses" className="text-ink/80 underline underline-offset-2 hover:text-ink">
+            expenses
+          </Link>
+          , the <span className="text-ink/80">production cost</span> on each variant, and
+          current stock levels. It covers all time — there is no date filter yet.
+        </p>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Net revenue" value={eur(netRevenue)} />
-        <Stat label="COGS" value={eur(cogs)} />
-        <Stat label="Gross profit" value={eur(grossProfit)} accent />
-        <Stat label="Gross margin" value={`${margin.toFixed(0)}%`} />
-        <Stat label="Expenses" value={eur(totalExpenses)} />
-        <Stat label="Net profit" value={eur(netProfit)} accent />
-        <Stat label="Units sold" value={unitsSold.toString()} />
-        <Stat label="Inventory @ cost" value={eur(inventoryValue)} />
+        <Stat label="Net revenue" value={eur(netRevenue)} source="Σ sales.net_amount" />
+        <Stat label="COGS" value={eur(cogs)} source="units sold × variant cost" />
+        <Stat label="Gross profit" value={eur(grossProfit)} source="net revenue − COGS" accent />
+        <Stat label="Gross margin" value={`${margin.toFixed(0)}%`} source="gross profit ÷ net revenue" />
+        <Stat label="Expenses" value={eur(totalExpenses)} source="Σ expenses.amount" />
+        <Stat label="Net profit" value={eur(netProfit)} source="gross profit − expenses" accent />
+        <Stat label="Units sold" value={unitsSold.toString()} source="Σ sales.quantity" />
+        <Stat label="Inventory @ cost" value={eur(inventoryValue)} source="stock on hand × variant cost" />
       </div>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
@@ -129,6 +159,25 @@ export default async function FinancePage() {
             </Table>
           )}
         </div>
+      </div>
+
+      <div className="max-w-2xl space-y-2 border-t border-line pt-6 text-xs text-ink/40">
+        <p className="label-caps text-ink/50">Worth knowing</p>
+        <p>
+          COGS only counts variants that have a production cost recorded. Anything
+          without one — raffle tickets, and any product whose cost was never filled in
+          — contributes €0 to COGS and so flatters gross margin. Worth checking before
+          quoting the margin.
+        </p>
+        <p>
+          COGS also uses each variant&apos;s <em>current</em> production cost, not the
+          cost at the moment it sold, so re-costing a variant moves history. Planning
+          ad spend against these margins lives in{" "}
+          <Link href="/campaign" className="text-ink/70 underline underline-offset-2 hover:text-ink">
+            Ad budget
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

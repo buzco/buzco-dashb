@@ -21,10 +21,17 @@ export default async function CatalogsPage() {
 
   return (
     <div className="space-y-10">
-      <h1 className="label-caps text-ink/60">Wholesale catalogs</h1>
+      <div>
+        <h1 className="label-caps text-ink/60">Line sheets</h1>
+        <p className="mt-2 max-w-2xl text-sm text-ink/50">
+          A line sheet is the priced selection you send a shop or boutique — pick the
+          pieces, set wholesale prices as a % of RRP, then draft the outreach email.
+          This is the B2B side; it never touches storefront pricing.
+        </p>
+      </div>
 
       {!catalogs?.length ? (
-        <p className="text-sm text-ink/50">No catalogs yet.</p>
+        <p className="text-sm text-ink/50">No line sheets yet.</p>
       ) : (
         <Table>
           <thead>
@@ -51,7 +58,7 @@ export default async function CatalogsPage() {
       )}
 
       <div className="max-w-md space-y-3">
-        <h2 className="label-caps text-ink/60">New catalog</h2>
+        <h2 className="label-caps text-ink/60">New line sheet</h2>
         <form action={createCatalog} className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="name">Name</Label>
@@ -61,7 +68,7 @@ export default async function CatalogsPage() {
             <Label htmlFor="notes">Notes</Label>
             <Input id="notes" name="notes" placeholder="MOQ, terms, lead time…" />
           </div>
-          <Button type="submit">Create catalog</Button>
+          <Button type="submit">Create line sheet</Button>
         </form>
       </div>
     </div>

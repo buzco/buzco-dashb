@@ -61,7 +61,8 @@ export default async function ProductsPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="label-caps text-ink/60">Catalog</h1>
+        {/* "Catalog" collided with the wholesale catalogs (now Line sheets). */}
+        <h1 className="label-caps text-ink/60">Products</h1>
         <Link href="/products/new">
           <Button>New product</Button>
         </Link>
