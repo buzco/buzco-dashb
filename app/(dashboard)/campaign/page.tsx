@@ -40,11 +40,37 @@ function skuStem(skus: string[]): string | null {
 export default async function CampaignPage() {
   const supabase = await createClient();
 
-  const [{ data: products }, { data: variants }, { data: stock }] = await Promise.all([
-    supabase.from("products").select("id, name, status").order("name"),
-    supabase.from("variants").select("id, product_id, production_cost, retail_price, sku"),
-    supabase.from("current_stock_by_variant").select("variant_id, total_quantity"),
-  ]);
+  const [{ data: products }, { data: variants }, { data: stock }, { data: onlineSales }] =
+    await Promise.all([
+      supabase.from("products").select("id, name, status").order("name"),
+      supabase.from("variants").select("id, product_id, production_cost, retail_price, sku"),
+      supabase.from("current_stock_by_variant").select("variant_id, total_quantity"),
+      // Online orders only. Market and raffle sales have completely different
+      // basket shapes and would drag the averages somewhere meaningless for a
+      // simulation of paid traffic to the storefront.
+      supabase
+        .from("sales")
+        .select("shopify_order_id, quantity, net_amount")
+        .eq("channel", "shopify"),
+    ]);
+
+  // Real basket shape, grouped back up from line items into orders.
+  const orders = new Map<string, { net: number; units: number }>();
+  for (const s of onlineSales ?? []) {
+    const key = s.shopify_order_id ?? `line:${orders.size}`;
+    const o = orders.get(key) ?? { net: 0, units: 0 };
+    o.net += Number(s.net_amount ?? 0);
+    o.units += s.quantity;
+    orders.set(key, o);
+  }
+  const orderList = [...orders.values()];
+  const observedOrders = orderList.length;
+  const observedAov = observedOrders
+    ? orderList.reduce((s, o) => s + o.net, 0) / observedOrders
+    : 0;
+  const observedUnitsPerOrder = observedOrders
+    ? orderList.reduce((s, o) => s + o.units, 0) / observedOrders
+    : 1.3;
 
   const stockByVariant = new Map((stock ?? []).map((s) => [s.variant_id, s.total_quantity ?? 0]));
 
@@ -91,13 +117,21 @@ export default async function CampaignPage() {
     <div className="space-y-8">
       <div>
         <h1 className="label-caps text-ink/60">Ad budget</h1>
-        <p className="mt-2 max-w-2xl text-sm text-ink/50">
-          Tick every product going into the campaign. Prices and costs are averaged
-          up from each product&apos;s variants (weighted by what you actually hold), so
-          you plan a campaign the way you&apos;d run it — per product, not per size.
-          The budget below is what the whole campaign can spend on ads and still
-          break even.
+        <p className="mt-2 max-w-3xl text-sm text-ink/50">
+          Pick what you&apos;re selling, set how many days and how much a day, and this
+          simulates the whole Meta funnel — what the budget buys in reach and clicks,
+          how many orders that becomes, and whether the result makes or loses money.
+          Hover any <span className="text-ink/70">?</span> for what a term means.
         </p>
+        {observedOrders > 0 && (
+          <p className="mt-2 max-w-3xl text-xs text-ink/40">
+            Basket defaults come from your {observedOrders} real Shopify orders — €
+            {observedAov.toFixed(2)} average order value at {observedUnitsPerOrder.toFixed(2)} units
+            per order.{" "}
+            {observedOrders < 30 &&
+              "That's a thin sample, so treat it as a starting point rather than a reliable average."}
+          </p>
+        )}
       </div>
 
       {!calcProducts.length ? (
@@ -105,7 +139,12 @@ export default async function CampaignPage() {
           Create a product with variants first, or sync from Shopify.
         </p>
       ) : (
-        <CampaignCalculator products={calcProducts} />
+        <CampaignCalculator
+          products={calcProducts}
+          observedUnitsPerOrder={observedUnitsPerOrder}
+          observedAov={observedAov}
+          observedOrders={observedOrders}
+        />
       )}
     </div>
   );
