@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 
-// public/buzco-logo.gif isn't in the repo, so every page currently renders a
-// broken-image icon in the nav. Rather than drop the logo (it comes back the
-// moment the file is added) fall back to a wordmark if it fails to load.
+// The animated Buzco wordmark (public/buzco-logo.gif — 1081x608, transparent).
+// Callers pass a 16:9 box to match. The plain-text fallback stays as a safety
+// net: it's a ~1MB GIF, and a nav with no brand at all is worse than a wordmark.
 
 export function Logo({
   width,
