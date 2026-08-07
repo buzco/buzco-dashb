@@ -2,6 +2,7 @@ import "server-only";
 
 import { shopifyGraphQL } from "@/lib/shopify/client";
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Import Shopify order history into the sales table for revenue reporting.
 //
@@ -35,8 +36,8 @@ type Order = {
 };
 
 const ORDERS_QUERY = `
-  query SyncOrders($cursor: String) {
-    orders(first: 50, after: $cursor, sortKey: CREATED_AT) {
+  query SyncOrders($cursor: String, $query: String) {
+    orders(first: 50, after: $cursor, sortKey: CREATED_AT, query: $query) {
       edges {
         node {
           id
@@ -60,8 +61,21 @@ const ORDERS_QUERY = `
   }
 `;
 
-export async function syncShopifyOrders(): Promise<OrderSyncResult> {
-  const supabase = await createClient();
+/**
+ * @param options.sinceIso Only look at orders created at or after this instant.
+ *   Webhook-driven syncs pass a short window so a single new order doesn't drag
+ *   the whole order history back through the API; a manual sync passes nothing
+ *   and does the full backfill.
+ * @param options.db Supabase client to write through. Defaults to the
+ *   cookie-backed server client. Webhook handlers have no session and RLS only
+ *   grants the `authenticated` role, so they must pass the service-role client
+ *   or every write silently no-ops.
+ */
+export async function syncShopifyOrders(
+  options: { sinceIso?: string; db?: SupabaseClient } = {},
+): Promise<OrderSyncResult> {
+  const supabase = options.db ?? (await createClient());
+  const searchQuery = options.sinceIso ? `created_at:>='${options.sinceIso}'` : null;
   const result: OrderSyncResult = {
     ordersSeen: 0,
     salesCreated: 0,
@@ -86,7 +100,7 @@ export async function syncShopifyOrders(): Promise<OrderSyncResult> {
         edges: Array<{ node: Order }>;
         pageInfo: { hasNextPage: boolean; endCursor: string | null };
       };
-    } = await shopifyGraphQL(ORDERS_QUERY, { cursor });
+    } = await shopifyGraphQL(ORDERS_QUERY, { cursor, query: searchQuery });
 
     for (const { node: o } of data.orders.edges) {
       result.ordersSeen++;

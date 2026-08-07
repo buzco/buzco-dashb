@@ -175,8 +175,14 @@ async function reconcileInventory(
   return true;
 }
 
-export async function syncFromShopify(): Promise<SyncResult> {
-  const supabase = await createClient();
+/**
+ * @param db Supabase client to write through. Defaults to the cookie-backed
+ *   server client, which is what a logged-in "Sync now" click wants. Webhook
+ *   handlers have no session and RLS only grants the `authenticated` role, so
+ *   they must pass the service-role client or every write silently no-ops.
+ */
+export async function syncFromShopify(db?: SupabaseClient): Promise<SyncResult> {
+  const supabase = db ?? (await createClient());
   const result: SyncResult = {
     productsCreated: 0,
     productsUpdated: 0,

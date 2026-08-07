@@ -5,9 +5,24 @@ import { syncFromShopify, type SyncResult } from "@/lib/shopify/sync";
 import { syncShopifyOrders, type OrderSyncResult } from "@/lib/shopify/orders";
 import { pushProductToShopify } from "@/lib/shopify/push";
 import { isShopifyConfigured } from "@/lib/shopify/client";
+import { registerWebhooks, type RegisterResult } from "@/lib/shopify/webhooks";
 
 export type ShopifySyncState = { result?: SyncResult; error?: string };
 export type OrderSyncState = { result?: OrderSyncResult; error?: string };
+export type WebhookState = { result?: RegisterResult; error?: string };
+
+/** Point the store's webhook subscriptions at this deployment. Re-runnable. */
+export async function registerShopifyWebhooks(): Promise<WebhookState> {
+  if (!isShopifyConfigured()) return { error: "Shopify is not connected" };
+
+  try {
+    const result = await registerWebhooks();
+    revalidatePath("/shopify");
+    return { result };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 export async function runShopifySync(): Promise<ShopifySyncState> {
   if (!isShopifyConfigured()) {

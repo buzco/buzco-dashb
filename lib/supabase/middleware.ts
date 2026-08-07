@@ -31,6 +31,14 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Shopify's webhook callback has no session and never will. Redirecting it to
+  // /login would answer 3xx, which Shopify counts as a delivery failure and
+  // retries for two days. The route authenticates itself instead, by verifying
+  // Shopify's HMAC over the raw request body.
+  if (request.nextUrl.pathname.startsWith("/api/shopify/webhook")) {
+    return supabaseResponse;
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
