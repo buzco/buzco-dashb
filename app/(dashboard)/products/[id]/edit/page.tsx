@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { updateProduct } from "@/lib/actions/products";
+import { listProductImages } from "@/lib/actions/product-image";
 import { Label, Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ export default async function EditProductPage({
   if (!product) {
     notFound();
   }
+
+  const images = await listProductImages(product.id);
 
   return (
     <div className="max-w-3xl space-y-10">
@@ -59,10 +62,15 @@ export default async function EditProductPage({
           <Button type="submit">Save changes</Button>
         </form>
 
-        {/* Image */}
+        {/* Images */}
         <div className="space-y-3">
-          <h2 className="label-caps text-ink/60">Picture</h2>
-          <ImageUploader productId={product.id} currentUrl={product.image_url} />
+          <h2 className="label-caps text-ink/60">Pictures</h2>
+          <ImageUploader
+            productId={product.id}
+            productName={product.name}
+            currentUrl={product.image_url}
+            images={images}
+          />
         </div>
       </div>
     </div>
