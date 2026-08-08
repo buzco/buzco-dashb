@@ -10,6 +10,7 @@ import {
   type ProductImage,
 } from "@/lib/actions/product-image";
 import { prepareImage, formatBytes, ImagePrepareError, MAX_DIM } from "@/lib/image-prepare";
+import { shopifyCdnResize } from "@/lib/shopify/image";
 import { Button } from "@/components/ui/button";
 import { Label, Input } from "@/components/ui/input";
 
@@ -149,7 +150,9 @@ export function ImageUploader({
             <div className="space-y-1">
               <div className="relative aspect-square overflow-hidden rounded-lg border border-pink bg-ink/5">
                 <Image
-                  src={external}
+                  // Shopify originals run to ~6 MB and blow the optimizer's
+                  // timeout — ask their CDN for a capped copy, as everywhere else.
+                  src={shopifyCdnResize(external, 400) ?? external}
                   alt={productName}
                   fill
                   sizes="140px"

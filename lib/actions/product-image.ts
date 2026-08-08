@@ -95,7 +95,13 @@ export async function uploadProductImage(
   const objectPath = `${productId}/${fileName}`;
 
   const admin = createAdminClient();
-  const { error: upErr } = await admin.storage.from(BUCKET).upload(objectPath, webp, {
+  // Upload as a Blob, not the raw Buffer sharp hands back. Under Next's
+  // patched server fetch a Buffer body gets stringified: the bytes come back
+  // UTF-8 re-encoded, ~1.8x bigger than the WebP header claims, and no browser
+  // will decode them. It silently stores a corrupt file. A Blob carries its own
+  // type and length, so it survives every fetch implementation intact.
+  const body = new Blob([new Uint8Array(webp)], { type: "image/webp" });
+  const { error: upErr } = await admin.storage.from(BUCKET).upload(objectPath, body, {
     contentType: "image/webp",
     upsert: true,
   });
@@ -124,9 +130,17 @@ export async function uploadProductImage(
   return { ok: true, image: { path: objectPath, url, name: fileName, bytes: webp.byteLength } };
 }
 
-// Every picture stored for a product. The bucket folder is the source of
-// truth — there's no gallery table, and one folder per product means listing
-// is enough. Ordered oldest first so the grid stays stable across uploads.
+// Every product-level picture stored for a product. The bucket folder is the
+// source of truth — there's no gallery table, and one folder per product means
+// listing is enough. Ordered oldest first so the grid stays stable across
+// uploads.
+//
+// Variant images live in the same folder, so they're filtered out: they belong
+// to a variant, and offering a Delete button for them here would orphan that
+// variant's image_url. They're matched two ways because a variant that has
+// since been pushed to Shopify has an image_url on Shopify's CDN rather than
+// ours, so comparing URLs alone would miss it — the filename still carries the
+// variant id we stamped into it at upload.
 export async function listProductImages(productId: string): Promise<ProductImage[]> {
   const admin = createAdminClient();
   const { data, error } = await admin.storage.from(BUCKET).list(productId, {
@@ -136,8 +150,27 @@ export async function listProductImages(productId: string): Promise<ProductImage
   if (error || !data) {
     return [];
   }
+
+  const supabase = await createClient();
+  const { data: variants } = await supabase
+    .from("variants")
+    .select("id, image_url")
+    .eq("product_id", productId);
+
+  const variantIdPrefixes = new Set((variants ?? []).map((v) => v.id.slice(0, 8)));
+  const variantFileNames = new Set(
+    (variants ?? [])
+      .map((v) => v.image_url?.split("/").pop()?.split("?")[0])
+      .filter((n): n is string => Boolean(n)),
+  );
+
+  const belongsToVariant = (name: string) =>
+    variantFileNames.has(name) ||
+    [...variantIdPrefixes].some((prefix) => name.includes(`-${prefix}-`));
+
   return data
     .filter((o) => o.name && !o.name.startsWith(".")) // skip .emptyFolderPlaceholder
+    .filter((o) => !belongsToVariant(o.name))
     .map((o) => {
       const path = `${productId}/${o.name}`;
       return {
