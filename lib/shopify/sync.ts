@@ -221,7 +221,7 @@ export async function syncFromShopify(db?: SupabaseClient): Promise<SyncResult> 
         // --- Upsert product by Shopify GID ---
         const { data: existingProduct } = await supabase
           .from("products")
-          .select("id")
+          .select("id, image_url")
           .eq("shopify_product_id", p.id)
           .maybeSingle();
 
@@ -231,7 +231,12 @@ export async function syncFromShopify(db?: SupabaseClient): Promise<SyncResult> 
           status: mapStatus(p.status),
           tags: p.tags.length ? p.tags : null,
           shopify_product_id: p.id,
-          image_url: p.featuredImage?.url ?? null,
+          // Keep whatever picture we already hold when Shopify reports none.
+          // Pushing a product fires a webhook immediately, and Shopify ingests
+          // media asynchronously afterwards — so a sync triggered by our own
+          // push sees featuredImage: null and would otherwise wipe the image
+          // the user just uploaded.
+          image_url: p.featuredImage?.url ?? existingProduct?.image_url ?? null,
         };
 
         let productId: string;

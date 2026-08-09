@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/product-image";
 import { prepareImage, formatBytes, ImagePrepareError, MAX_DIM } from "@/lib/image-prepare";
 import { shopifyCdnResize } from "@/lib/shopify/image";
+import { pushProductImagesAction } from "@/lib/actions/shopify";
 import { Button } from "@/components/ui/button";
 import { Label, Input } from "@/components/ui/input";
 
@@ -20,6 +21,19 @@ type QueueItem = {
   status: "waiting" | "working" | "done" | "error";
   note?: string;
 };
+
+// Shopify keeps our filename when it re-hosts an image, so after a sync the
+// product's main picture is the same file as a gallery tile — just served from
+// their CDN under a different URL. Comparing filenames is what makes the two
+// recognisable as one image.
+function fileNameOf(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "") || null;
+  } catch {
+    return null;
+  }
+}
 
 function slugify(s: string): string {
   return s
@@ -35,11 +49,13 @@ export function ImageUploader({
   productName,
   currentUrl,
   images,
+  shopifyLinked,
 }: {
   productId: string;
   productName: string;
   currentUrl: string | null;
   images: ProductImage[];
+  shopifyLinked: boolean;
 }) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -49,6 +65,7 @@ export function ImageUploader({
   const [base, setBase] = useState(slugify(productName) || "product");
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [shopifyNote, setShopifyNote] = useState<{ text: string; bad: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
 
   function onPick(files: FileList | null) {
@@ -110,15 +127,39 @@ export function ImageUploader({
       }
     }
 
+    // Storing the picture is only half the job — it has to reach the store, or
+    // the product page customers see is unchanged.
+    if (uploadedAny && shopifyLinked) {
+      await sendToShopify();
+    }
+
     setBusy(false);
     if (fileInput.current) fileInput.current.value = "";
     if (uploadedAny) router.refresh();
+  }
+
+  async function sendToShopify() {
+    setShopifyNote({ text: "Sending to Shopify…", bad: false });
+    const res = await pushProductImagesAction(productId);
+    if (res.error) {
+      setShopifyNote({ text: `Shopify: ${res.error}`, bad: true });
+      return;
+    }
+    const r = res.result;
+    const bits = [`${r?.created ?? 0} sent to Shopify`];
+    if (r?.alreadyThere) bits.push(`${r.alreadyThere} already there`);
+    if (r?.featuredSet) bits.push("main image featured");
+    if (r?.variantsWithImage) bits.push(`${r.variantsWithImage} variants linked`);
+    setShopifyNote({ text: bits.join(" · ") + " ✓", bad: false });
   }
 
   function makePrimary(url: string) {
     setPrimary(url);
     startTransition(async () => {
       await setPrimaryImage(productId, url);
+      // Shopify features whichever media sits first, so the choice only counts
+      // once it's been reordered over there too.
+      if (shopifyLinked) await sendToShopify();
       router.refresh();
     });
   }
@@ -138,8 +179,13 @@ export function ImageUploader({
 
   // A Shopify-synced product's picture lives on their CDN, not in our bucket,
   // so it won't come back from the listing. Show it alongside ours (it isn't
-  // ours to delete) rather than leaving the grid with no main image.
-  const external = primary && !gallery.some((i) => i.url === primary) ? primary : null;
+  // ours to delete) rather than leaving the grid with no main image — unless
+  // it's just their copy of a picture already in the gallery, which would
+  // otherwise appear twice.
+  const primaryName = fileNameOf(primary);
+  const isMain = (image: ProductImage) =>
+    image.url === primary || (primaryName !== null && image.name === primaryName);
+  const external = primary && !gallery.some(isMain) ? primary : null;
 
   return (
     <div className="space-y-5">
@@ -166,7 +212,7 @@ export function ImageUploader({
             </div>
           )}
           {gallery.map((image) => {
-            const isPrimary = image.url === primary;
+            const isPrimary = isMain(image);
             return (
               <div key={image.path} className="space-y-1">
                 <div
@@ -263,11 +309,33 @@ export function ImageUploader({
           </ul>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button type="button" onClick={upload} disabled={busy || waiting === 0}>
             {busy ? "Working…" : `Upload ${waiting || ""} ${waiting === 1 ? "image" : "images"}`}
           </Button>
+          {shopifyLinked && gallery.length > 0 && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy || pending}
+              onClick={() => startTransition(sendToShopify)}
+            >
+              Push images to Shopify
+            </Button>
+          )}
         </div>
+
+        {shopifyNote && (
+          <p className={`text-xs ${shopifyNote.bad ? "text-status-cancelled" : "text-ink/60"}`}>
+            {shopifyNote.text}
+          </p>
+        )}
+        {!shopifyLinked && (
+          <p className="text-xs text-ink/40">
+            This product isn&apos;t linked to Shopify yet — push the product first and its pictures
+            go with it.
+          </p>
+        )}
 
         <p className="text-xs text-ink/40">
           Each picture is resized to max {MAX_DIM}px, converted to WebP and renamed. The first one

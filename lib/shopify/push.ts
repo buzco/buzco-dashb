@@ -2,6 +2,7 @@ import "server-only";
 
 import { shopifyGraphQL } from "@/lib/shopify/client";
 import { createClient } from "@/lib/supabase/server";
+import { listProductImageObjects, isOurStorageUrl, baseName } from "@/lib/product-images";
 
 // Push a local product to Shopify as a DRAFT (invisible to customers until the
 // user publishes it there). Uses productSet to declare options + variants +
@@ -9,7 +10,12 @@ import { createClient } from "@/lib/supabase/server";
 // rows. Only creates — a product already linked to Shopify is left alone (guards
 // against duplicates).
 
-export type PushResult = { productGid: string; variantsLinked: number };
+export type PushResult = {
+  productGid: string;
+  variantsLinked: number;
+  images?: ImagePushResult;
+  imageError?: string;
+};
 
 const PRODUCT_SET = `
   mutation PushProduct($input: ProductSetInput!) {
@@ -104,23 +110,58 @@ export async function pushProductToShopify(productId: string): Promise<PushResul
     }
   }
 
-  await pushProductImages(supabase, productId).catch(() => {
-    // Images are cosmetic next to the product itself existing; a failure here
-    // is reported by the standalone retry rather than losing the whole push.
-  });
+  // The product existing matters more than its pictures, so an image failure
+  // doesn't undo the push — but it is reported rather than swallowed. Silently
+  // discarding this is exactly what hid the images never arriving at all.
+  let imageError: string | undefined;
+  let images: ImagePushResult | undefined;
+  try {
+    images = await pushProductImages(supabase, productId);
+    if (images.errors.length) imageError = images.errors.join("; ");
+  } catch (e) {
+    imageError = e instanceof Error ? e.message : String(e);
+  }
 
-  return { productGid: productSet.product.id, variantsLinked };
+  return { productGid: productSet.product.id, variantsLinked, images, imageError };
 }
 
 // ---------------------------------------------------------------------------
 // Images
 // ---------------------------------------------------------------------------
 
-const PRODUCT_CREATE_MEDIA = `
-  mutation AddProductMedia($productId: ID!, $media: [CreateMediaInput!]!) {
-    productCreateMedia(productId: $productId, media: $media) {
-      media { ... on MediaImage { id status image { url } } }
-      mediaUserErrors { field message }
+// `productCreateMedia` was removed in API 2025-10. Media is now attached by
+// passing it alongside productUpdate, which takes `media` as its own argument
+// rather than a field on the input. Calling the old mutation failed outright,
+// and because the caller swallowed image errors, uploads silently never
+// reached the store.
+const PRODUCT_ADD_MEDIA = `
+  mutation AddProductMedia($product: ProductUpdateInput!, $media: [CreateMediaInput!]!) {
+    productUpdate(product: $product, media: $media) {
+      product {
+        id
+        media(first: 100) {
+          edges { node { ... on MediaImage { id status image { url } } } }
+        }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+const PRODUCT_MEDIA = `
+  query ProductMedia($id: ID!) {
+    product(id: $id) {
+      media(first: 100) {
+        edges { node { ... on MediaImage { id status image { url } } } }
+      }
+    }
+  }
+`;
+
+const REORDER_MEDIA = `
+  mutation ReorderMedia($id: ID!, $moves: [MoveInput!]!) {
+    productReorderMedia(id: $id, moves: $moves) {
+      userErrors { field message }
     }
   }
 `;
@@ -141,7 +182,13 @@ const MEDIA_STATUS = `
 
 type SupabaseLike = Awaited<ReturnType<typeof createClient>>;
 
-export type ImagePushResult = { created: number; variantsWithImage: number; errors: string[] };
+export type ImagePushResult = {
+  created: number;
+  alreadyThere: number;
+  variantsWithImage: number;
+  featuredSet: boolean;
+  errors: string[];
+};
 
 /**
  * Sends our images to Shopify by URL.
@@ -149,12 +196,27 @@ export type ImagePushResult = { created: number; variantsWithImage: number; erro
  * The images already live in public Supabase Storage, so Shopify can fetch them
  * itself via `originalSource` — which sidesteps the staged-upload dance the
  * Files API would otherwise require.
+ *
+ * Safe to re-run: Shopify keeps the source filename in the CDN URL it hands
+ * back, so anything already on the product is recognised and skipped instead of
+ * being uploaded a second time. That matters because this runs after every
+ * upload batch, not just on first push.
+ *
+ * Only our own storage URLs are sent. After a sync, `image_url` holds a
+ * cdn.shopify.com URL, and pushing those back would have Shopify re-ingest its
+ * own images as duplicates.
  */
 export async function pushProductImages(
   supabase: SupabaseLike,
   productId: string,
 ): Promise<ImagePushResult> {
-  const result: ImagePushResult = { created: 0, variantsWithImage: 0, errors: [] };
+  const result: ImagePushResult = {
+    created: 0,
+    alreadyThere: 0,
+    variantsWithImage: 0,
+    featuredSet: false,
+    errors: [],
+  };
 
   const { data: product } = await supabase
     .from("products")
@@ -168,53 +230,116 @@ export async function pushProductImages(
     .select("id, color, size, image_url, shopify_variant_id")
     .eq("product_id", productId);
 
-  // One media entry per distinct URL; the product shot leads so it becomes the
-  // featured image.
-  const urls: Array<{ url: string; alt: string }> = [];
+  // Candidates: every picture in the product's gallery, plus any variant shot.
+  const candidates: Array<{ url: string; alt: string }> = [];
   const seen = new Set<string>();
   const add = (url: string | null, alt: string) => {
-    if (!url || seen.has(url)) return;
-    seen.add(url);
-    urls.push({ url, alt });
+    if (!isOurStorageUrl(url) || seen.has(url!)) return;
+    seen.add(url!);
+    candidates.push({ url: url!, alt });
   };
-  add(product.image_url, product.name);
+  for (const image of await listProductImageObjects(productId)) {
+    add(image.url, product.name);
+  }
   for (const v of variants ?? []) {
     add(v.image_url, [product.name, v.color, v.size].filter(Boolean).join(" — "));
   }
-  if (!urls.length) return result;
+  if (!candidates.length) return result;
 
-  const created = await shopifyGraphQL<{
-    productCreateMedia: {
-      media: Array<{ id: string; status: string; image: { url: string } | null }>;
-      mediaUserErrors: Array<{ message: string }>;
-    };
-  }>(PRODUCT_CREATE_MEDIA, {
-    productId: product.shopify_product_id,
-    media: urls.map((u) => ({
-      originalSource: u.url,
-      alt: u.alt,
-      mediaContentType: "IMAGE",
-    })),
-  });
+  // What's on the product already, by filename.
+  const existing = await shopifyGraphQL<{
+    product: { media: { edges: Array<{ node: { id: string; image: { url: string } | null } }> } } | null;
+  }>(PRODUCT_MEDIA, { id: product.shopify_product_id });
 
-  if (created.productCreateMedia.mediaUserErrors.length) {
-    result.errors.push(...created.productCreateMedia.mediaUserErrors.map((e) => e.message));
+  const mediaIdByFileName = new Map<string, string>();
+  for (const edge of existing.product?.media.edges ?? []) {
+    const name = baseName(edge.node.image?.url);
+    if (name) mediaIdByFileName.set(name, edge.node.id);
   }
-  const mediaIds = created.productCreateMedia.media.map((m) => m.id);
-  result.created = mediaIds.length;
 
-  // Media are ingested asynchronously and cannot be attached to a variant until
-  // Shopify reports READY, so wait briefly rather than racing it.
-  const byUrlIndex = new Map(urls.map((u, i) => [u.url, i]));
-  await waitForMedia(mediaIds);
+  const toCreate = candidates.filter((c) => {
+    const name = baseName(c.url);
+    return name ? !mediaIdByFileName.has(name) : true;
+  });
+  result.alreadyThere = candidates.length - toCreate.length;
+
+  if (toCreate.length) {
+    const added = await shopifyGraphQL<{
+      productUpdate: {
+        product: { media: { edges: Array<{ node: { id: string; image: { url: string } | null } }> } } | null;
+        userErrors: Array<{ field: string[]; message: string }>;
+      };
+    }>(PRODUCT_ADD_MEDIA, {
+      product: { id: product.shopify_product_id },
+      media: toCreate.map((c) => ({
+        originalSource: c.url,
+        alt: c.alt,
+        mediaContentType: "IMAGE",
+      })),
+    });
+
+    if (added.productUpdate.userErrors.length) {
+      result.errors.push(...added.productUpdate.userErrors.map((e) => e.message));
+    } else {
+      result.created = toCreate.length;
+    }
+
+    // Media are ingested asynchronously; nothing can be attached to a variant
+    // or reordered until Shopify reports READY, so wait rather than race it.
+    const newIds = (added.productUpdate.product?.media.edges ?? [])
+      .map((e) => e.node.id)
+      .filter((id) => !new Set(mediaIdByFileName.values()).has(id));
+    await waitForMedia(newIds);
+
+    // Re-read so every filename maps to a real media id, including the new ones.
+    const after = await shopifyGraphQL<{
+      product: { media: { edges: Array<{ node: { id: string; image: { url: string } | null } }> } } | null;
+    }>(PRODUCT_MEDIA, { id: product.shopify_product_id });
+    mediaIdByFileName.clear();
+    for (const edge of after.product?.media.edges ?? []) {
+      const name = baseName(edge.node.image?.url);
+      if (name) mediaIdByFileName.set(name, edge.node.id);
+    }
+  }
+
+  // A product can reach here with no main picture recorded — a sync fired by
+  // our own push can land before Shopify has ingested any media. Fall back to
+  // the first gallery image so "main" is always something concrete.
+  // Only fills a genuinely empty slot: once a sync has run, image_url points at
+  // Shopify's own CDN copy, which is correct and keeps the same filename — so
+  // it still resolves to the right media below.
+  let mainUrl = product.image_url;
+  if (!mainUrl && candidates.length) {
+    mainUrl = candidates[0].url;
+    await supabase.from("products").update({ image_url: mainUrl }).eq("id", productId);
+  }
+
+  // The picture marked main here should be the one Shopify features, which is
+  // whichever media sits at position 0.
+  const mainName = baseName(mainUrl);
+  const mainMediaId = mainName ? mediaIdByFileName.get(mainName) : undefined;
+  if (mainMediaId) {
+    const moved = await shopifyGraphQL<{
+      productReorderMedia: { userErrors: Array<{ message: string }> };
+    }>(REORDER_MEDIA, {
+      id: product.shopify_product_id,
+      moves: [{ id: mainMediaId, newPosition: "0" }],
+    });
+    if (moved.productReorderMedia.userErrors.length) {
+      result.errors.push(...moved.productReorderMedia.userErrors.map((e) => e.message));
+    } else {
+      result.featuredSet = true;
+    }
+  }
 
   const variantUpdates = (variants ?? [])
-    .filter((v) => v.shopify_variant_id && v.image_url && byUrlIndex.has(v.image_url))
-    .map((v) => ({
-      id: v.shopify_variant_id as string,
-      mediaId: mediaIds[byUrlIndex.get(v.image_url as string) as number],
-    }))
-    .filter((u) => u.mediaId);
+    .filter((v) => v.shopify_variant_id)
+    .map((v) => {
+      const name = baseName(v.image_url);
+      const mediaId = name ? mediaIdByFileName.get(name) : undefined;
+      return mediaId ? { id: v.shopify_variant_id as string, mediaId } : null;
+    })
+    .filter((u): u is { id: string; mediaId: string } => u !== null);
 
   if (variantUpdates.length) {
     const res = await shopifyGraphQL<{

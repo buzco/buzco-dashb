@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { syncFromShopify, type SyncResult } from "@/lib/shopify/sync";
 import { syncShopifyOrders, type OrderSyncResult } from "@/lib/shopify/orders";
-import { pushProductToShopify } from "@/lib/shopify/push";
+import { pushProductToShopify, pushProductImages, type ImagePushResult } from "@/lib/shopify/push";
+import { createClient } from "@/lib/supabase/server";
 import { isShopifyConfigured } from "@/lib/shopify/client";
 import { registerWebhooks, type RegisterResult } from "@/lib/shopify/webhooks";
 
@@ -50,6 +51,29 @@ export async function pushProductToShopifyAction(productId: string): Promise<Pus
     revalidatePath(`/products/${productId}`);
     revalidatePath("/products");
     return { ok: true, linked: r.variantsLinked };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export type ImagePushState = { ok?: boolean; error?: string; result?: ImagePushResult };
+
+/**
+ * Send a product's pictures to Shopify. Runs after an upload batch in the
+ * editor, and is re-runnable — already-published images are skipped, so
+ * pressing it twice doesn't duplicate media on the store.
+ */
+export async function pushProductImagesAction(productId: string): Promise<ImagePushState> {
+  if (!isShopifyConfigured()) return { error: "Shopify is not connected" };
+  try {
+    const supabase = await createClient();
+    const result = await pushProductImages(supabase, productId);
+    revalidatePath(`/products/${productId}`);
+    revalidatePath(`/products/${productId}/edit`);
+    revalidatePath("/products");
+    return result.errors.length
+      ? { error: result.errors.join("; "), result }
+      : { ok: true, result };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

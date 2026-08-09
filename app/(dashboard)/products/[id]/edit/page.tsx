@@ -17,7 +17,7 @@ export default async function EditProductPage({
   const supabase = await createClient();
   const { data: product } = await supabase
     .from("products")
-    .select("id, name, description, status, tags, image_url")
+    .select("id, name, description, status, tags, image_url, shopify_product_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -70,6 +70,7 @@ export default async function EditProductPage({
             productName={product.name}
             currentUrl={product.image_url}
             images={images}
+            shopifyLinked={Boolean(product.shopify_product_id)}
           />
         </div>
       </div>
