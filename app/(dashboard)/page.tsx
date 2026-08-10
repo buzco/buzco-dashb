@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { Table, Th, Td } from "@/components/ui/table";
+import { AdsCard } from "./ads-card";
 
 // The landing page. Its whole job is to answer "is anything wrong, and what
 // moved since I last looked?" without making you open five tabs. Everything
@@ -180,6 +181,8 @@ export default async function HomePage() {
           sub="products linked"
         />
       </div>
+
+      <AdsCard />
 
       {!!openMarkets?.length && (
         <Panel title="Markets open now" href="/markets" linkLabel="All markets">

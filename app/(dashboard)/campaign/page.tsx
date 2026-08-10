@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { CampaignCalculator, type CalcProduct } from "./calculator";
+import { LiveOverview } from "./live-overview";
 
 // A campaign promotes a PRODUCT, not a size. So the numbers are rolled up from
 // variants to the product here: stock sums, while price and cost are averaged
@@ -132,6 +133,20 @@ export default async function CampaignPage() {
               "That's a thin sample, so treat it as a starting point rather than a reliable average."}
           </p>
         )}
+      </div>
+
+      {/* Rendered inline rather than behind <Suspense>. Streaming this boundary
+          left the fallback stuck on screen with the resolved markup sitting
+          unswapped in a <template>, so the page waits the ~3s the Graph API
+          takes and ships complete HTML instead. */}
+      <LiveOverview />
+
+      <div className="space-y-3 border-t border-line pt-8">
+        <h2 className="label-caps text-ink/60">Plan a campaign</h2>
+        <p className="max-w-3xl text-sm text-ink/50">
+          Everything above is what already happened. This is the forecast — set days and
+          daily budget and it simulates the funnel forward.
+        </p>
       </div>
 
       {!calcProducts.length ? (
