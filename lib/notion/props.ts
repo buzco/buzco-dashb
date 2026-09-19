@@ -72,10 +72,26 @@ const READ_ONLY = new Set([
  */
 export function toPropertyValue(
   prop: NotionPropertySchema,
-  value: string | number | boolean | Date | null,
+  value: string | number | boolean | Date | string[] | null,
 ): Record<string, unknown> | null {
   if (value === null || value === "") return null;
   if (READ_ONLY.has(prop.type)) return null;
+
+  // An array only means anything to a multi_select — their tracker carries
+  // "Por pagar" and "SOLD" on the same row, which is two facts about one
+  // garment, not two rows. Anywhere else, take the first value and move on.
+  if (Array.isArray(value)) {
+    const names = value.filter(Boolean);
+    if (!names.length) return null;
+    if (prop.type === "multi_select") {
+      return {
+        multi_select: names.map((n) => ({
+          name: matchOption(prop.multi_select?.options ?? [], n) ?? n,
+        })),
+      };
+    }
+    return toPropertyValue(prop, names[0]);
+  }
 
   const asText = value instanceof Date ? value.toISOString() : String(value);
 
@@ -131,6 +147,12 @@ export function toPropertyValue(
   }
 }
 
+/** Nothing to write — so not worth reporting as a field we could not map. */
+function isEmptyValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === "") return true;
+  return Array.isArray(value) && value.filter(Boolean).length === 0;
+}
+
 /**
  * Build a properties payload from logical fields.
  * Each field names its aliases and its value; unmapped fields drop out.
@@ -139,7 +161,8 @@ export function buildProperties(
   db: NotionDatabase,
   fields: Array<{
     aliases: string[];
-    value: string | number | boolean | Date | null;
+    /** An array is only meaningful for a multi_select (e.g. Por pagar + SOLD). */
+    value: string | number | boolean | Date | string[] | null;
     /** Write to the database's title property instead of matching by name. */
     isTitle?: boolean;
   }>,
@@ -150,7 +173,7 @@ export function buildProperties(
   for (const field of fields) {
     const prop = field.isTitle ? findTitleProp(db) : findProp(db, field.aliases);
     if (!prop) {
-      if (field.value !== null && field.value !== "") skipped.push(field.aliases[0]);
+      if (!isEmptyValue(field.value)) skipped.push(field.aliases[0]);
       continue;
     }
     // A field explicitly aimed at the title must not overwrite a value already
@@ -159,7 +182,7 @@ export function buildProperties(
 
     const payload = toPropertyValue(prop, field.value);
     if (!payload) {
-      if (field.value !== null && field.value !== "") skipped.push(prop.name);
+      if (!isEmptyValue(field.value)) skipped.push(prop.name);
       continue;
     }
     properties[prop.name] = payload;

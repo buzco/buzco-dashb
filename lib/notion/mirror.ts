@@ -33,6 +33,7 @@ type SaleRow = {
   sold_at: string;
   notion_page_id: string | null;
   is_freebie: boolean | null;
+  consignment_sold_at: string | null;
   market_events: { name: string } | null;
   sale_orders: {
     reference: string;
@@ -52,7 +53,7 @@ type SaleRow = {
 
 const SALE_SELECT = `
   id, quantity, gross_amount, discount_amount, customer_ref, payment_method, sold_at,
-  notion_page_id, is_freebie,
+  notion_page_id, is_freebie, consignment_sold_at,
   market_events ( name ),
   sale_orders ( reference, kind, where_sold, payment_status, customer_name, retailers ( name ) ),
   variants ( sku, size, color, products ( name ) )
@@ -98,12 +99,20 @@ async function selectSales(
  * logged as payment-pending, and the "Unpaid" marker the Shopify POS importer
  * writes into payment_method for a PENDING order.
  */
-function statusFor(sale: SaleRow): string {
+function statusFor(sale: SaleRow): string[] {
   const net = Number(sale.gross_amount) - Number(sale.discount_amount);
-  if (sale.is_freebie || net <= 0) return STATUS.gift;
-  if (sale.sale_orders?.payment_status === "pending") return STATUS.pending;
-  if ((sale.payment_method ?? "").toLowerCase() === "unpaid") return STATUS.pending;
-  return STATUS.paid;
+  const statuses: string[] = [];
+
+  if (sale.is_freebie || net <= 0) statuses.push(STATUS.gift);
+  else if (sale.sale_orders?.payment_status === "pending") statuses.push(STATUS.pending);
+  else if ((sale.payment_method ?? "").toLowerCase() === "unpaid") statuses.push(STATUS.pending);
+  else statuses.push(STATUS.paid);
+
+  // Consigned and sold off the shop's rail, but not yet settled with us — the
+  // combination the tracker already carries by hand on the Cybercafé rows.
+  if (sale.consignment_sold_at) statuses.push(STATUS.sold);
+
+  return statuses;
 }
 
 /**
@@ -146,7 +155,7 @@ function toNotionItem(sale: SaleRow, options: Awaited<ReturnType<typeof getSales
     quantity: qty,
     // Written through matchOption so the tracker's own spelling wins rather
     // than ours auto-creating a near-duplicate option.
-    status: matchOption(options.status, statusFor(sale)),
+    statuses: statusFor(sale).map((name) => matchOption(options.status, name)),
     paymentMethod: payment ? matchOption(options.payment, payment) : null,
     where: sale.sale_orders?.where_sold
       ? matchOption(options.where, sale.sale_orders.where_sold)
@@ -269,7 +278,7 @@ export async function resyncOrderInNotion(
     for (const pageId of pageIds) {
       try {
         const { properties } = buildProperties(db, [
-          { aliases: ["Status", "Estado"], value: item.status },
+          { aliases: ["Status", "Estado"], value: item.statuses },
           {
             aliases: [
               "Método pagamento",

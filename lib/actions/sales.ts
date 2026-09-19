@@ -7,8 +7,13 @@ import {
   settleSaleOrder,
   type RecordSaleOrderInput,
 } from "@/lib/sales/record-order";
-import { mirrorUnsyncedForOrder } from "@/lib/notion/mirror";
+import { mirrorUnsyncedForOrder, resyncOrderInNotion } from "@/lib/notion/mirror";
 import { clearSalesOptionsCache } from "@/lib/notion/options";
+import { isNotionConfigured } from "@/lib/notion/client";
+import {
+  importNotionConsignments,
+  type ConsignmentImportResult,
+} from "@/lib/sales/import-notion-consignments";
 
 // Server actions for the sales tab.
 //
@@ -150,6 +155,40 @@ export async function returnConsignedLine(
   }
 }
 
+/**
+ * The shop sold a consigned piece off its rail.
+ *
+ * Deliberately separate from settling: weeks pass between a shop selling a tee
+ * and paying us for it, and the Notion tracker already records both facts at
+ * once (Status "Por pagar" + "SOLD"). Marking sold re-states that row's Notion
+ * pages so the two stay in step.
+ */
+export async function setLineSold(
+  orderId: string,
+  saleId: string,
+  sold: boolean,
+): Promise<SaleOrderState> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("set_consignment_line_sold", {
+      p_sale_id: saleId,
+      p_sold: sold,
+    });
+    if (error) return { error: error.message, at: Date.now() };
+
+    const warnings: string[] = [];
+    if (isNotionConfigured()) {
+      const resync = await resyncOrderInNotion(orderId, supabase);
+      if (resync.failed) warnings.push(`${resync.failed} Notion page(s) didn't update.`);
+    }
+
+    revalidateSales();
+    return { ok: true, orderId, warnings, at: Date.now() };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e), at: Date.now() };
+  }
+}
+
 /** Create a wholesale customer mid-sale, without leaving the logger. */
 export async function createCustomer(
   name: string,
@@ -199,4 +238,35 @@ export async function retryOrderNotion(orderId: string): Promise<SaleOrderState>
 export async function refreshNotionOptions(): Promise<void> {
   clearSalesOptionsCache();
   revalidateSales();
+}
+
+/**
+ * One-off backfill of the consignations that predate this tab — the pieces at
+ * Cybercafé recorded in the Notion tracker by hand.
+ *
+ * Deliberately not wired to a button in the UI: it is run once, and an import
+ * that can be re-triggered by a stray click on a page someone left open is a
+ * liability. Call it from a script (see scripts/) or a one-line route.
+ */
+export async function importConsignmentsFromNotion(
+  since: string,
+  retailerId: string,
+  dryRun = true,
+): Promise<ConsignmentImportResult & { error?: string }> {
+  try {
+    const supabase = await createClient();
+    const result = await importNotionConsignments(supabase, { since, retailerId, dryRun });
+    if (!dryRun) revalidateSales();
+    return result;
+  } catch (e) {
+    return {
+      scanned: 0,
+      ordersCreated: 0,
+      linesCreated: 0,
+      skippedAlreadyImported: 0,
+      unmatched: [],
+      errors: [],
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
 }

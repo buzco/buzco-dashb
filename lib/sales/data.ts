@@ -24,6 +24,8 @@ export type SaleOrderLineView = {
   discountAmount: number;
   netAmount: number;
   isFreebie: boolean;
+  /** Set once the shop has sold this piece off its rail. Consignations only. */
+  soldAt: string | null;
   notionPageId: string | null;
   notionError: string | null;
 };
@@ -52,6 +54,8 @@ export type SaleOrderView = {
   discount: number;
   net: number;
   unsyncedNotion: number;
+  /** Pieces the shop has already sold, on a consignation. */
+  soldUnits: number;
 };
 
 type OrderRow = {
@@ -123,7 +127,7 @@ export async function loadSaleOrders(options: LoadOptions = {}): Promise<SaleOrd
     supabase
       .from("sales")
       .select(
-        "id, sale_order_id, variant_id, quantity, gross_amount, discount_amount, net_amount, is_freebie, notion_page_id, notion_error",
+        "id, sale_order_id, variant_id, quantity, gross_amount, discount_amount, net_amount, is_freebie, consignment_sold_at, notion_page_id, notion_error",
       )
       .in("sale_order_id", orders.map((o) => o.id)),
     (async () => {
@@ -169,6 +173,7 @@ export async function loadSaleOrders(options: LoadOptions = {}): Promise<SaleOrd
       discountAmount: Number(s.discount_amount),
       netAmount: Number(s.net_amount),
       isFreebie: Boolean(s.is_freebie),
+      soldAt: s.consignment_sold_at,
       notionPageId: s.notion_page_id,
       notionError: s.notion_error,
     });
@@ -204,6 +209,7 @@ export async function loadSaleOrders(options: LoadOptions = {}): Promise<SaleOrd
       discount: lines.reduce((n, l) => n + l.discountAmount, 0),
       net: lines.reduce((n, l) => n + l.netAmount, 0),
       unsyncedNotion: lines.filter((l) => !l.notionPageId).length,
+      soldUnits: lines.filter((l) => l.soldAt).reduce((n, l) => n + l.quantity, 0),
     };
   });
 }

@@ -406,6 +406,7 @@ export interface Database {
           notion_error: string | null;
           sale_order_id: string | null;
           is_freebie: boolean;
+          consignment_sold_at: string | null;
           customer_ref: string | null;
           sold_at: string;
           notes: string | null;
@@ -428,6 +429,7 @@ export interface Database {
           notion_error?: string | null;
           sale_order_id?: string | null;
           is_freebie?: boolean;
+          consignment_sold_at?: string | null;
           customer_ref?: string | null;
           sold_at?: string;
           notes?: string | null;
@@ -450,6 +452,7 @@ export interface Database {
           notion_error?: string | null;
           sale_order_id?: string | null;
           is_freebie?: boolean;
+          consignment_sold_at?: string | null;
           customer_ref?: string | null;
           sold_at?: string;
           notes?: string | null;
@@ -962,6 +965,14 @@ export interface Database {
           p_settled_at?: string;
         };
         Returns: Database["public"]["Tables"]["sale_orders"]["Row"];
+      };
+      set_consignment_line_sold: {
+        Args: {
+          p_sale_id: string;
+          p_sold: boolean;
+          p_sold_at?: string;
+        };
+        Returns: Database["public"]["Tables"]["sales"]["Row"];
       };
       return_sale_order_line: {
         Args: {

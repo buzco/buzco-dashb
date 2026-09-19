@@ -5,6 +5,7 @@ import {
   settleOrder,
   retryOrderNotion,
   returnConsignedLine,
+  setLineSold,
   type SaleOrderState,
 } from "@/lib/actions/sales";
 
@@ -75,6 +76,41 @@ export function RetryNotionButton({ orderId, count }: { orderId: string; count: 
       className="label-caps rounded-md border border-status-ordered/60 px-3 py-2 text-status-ordered disabled:opacity-50"
     >
       {pending ? "Retrying…" : `Retry Notion (${count})`}
+    </button>
+  );
+}
+
+/**
+ * "The shop sold this one."
+ *
+ * A toggle rather than a one-way button, because this gets tapped off a
+ * handwritten list or a phone call and mis-taps are ordinary. Marking sold does
+ * not touch what is owed — that is what settling the order is for.
+ */
+export function SoldToggle({
+  orderId,
+  saleId,
+  sold,
+}: {
+  orderId: string;
+  saleId: string;
+  sold: boolean;
+}) {
+  const [pending, start] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      aria-pressed={sold}
+      onClick={() => start(async () => void (await setLineSold(orderId, saleId, !sold)))}
+      className={`label-caps shrink-0 rounded-full border px-2.5 py-1 disabled:opacity-50 ${
+        sold
+          ? "border-status-received text-status-received"
+          : "border-line text-ink/40 hover:border-ink/60 hover:text-ink"
+      }`}
+      title={sold ? "Sold by the shop — tap to undo" : "Mark as sold by the shop"}
+    >
+      {pending ? "…" : sold ? "Sold" : "Mark sold"}
     </button>
   );
 }

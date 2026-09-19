@@ -71,6 +71,16 @@ alter table sales add column if not exists sale_order_id uuid references sale_or
 -- and "sold at a 100% discount" mean different things in the Notion tracker.
 alter table sales add column if not exists is_freebie boolean not null default false;
 
+-- Consigned stock has TWO states, not one, and they move independently: the
+-- shop sells a piece off the rail (this column), and separately the shop pays
+-- us for what it sold (sale_orders.payment_status). Weeks can pass between.
+--
+-- This mirrors what the Notion tracker already does by hand — its Status
+-- multi-select carries "Por pagar" and "SOLD" together on 14 of the 46 pieces
+-- currently at Cybercafé — so the app reads and writes the convention that is
+-- already in use rather than inventing a second one.
+alter table sales add column if not exists consignment_sold_at timestamptz;
+
 create index if not exists sales_sale_order_idx on sales (sale_order_id);
 
 -- ============================================================
@@ -223,6 +233,34 @@ begin
 end;
 $fn$;
 
+-- The shop sold a piece off the rail. Not the same as being paid for it, so
+-- this deliberately does not touch payment_status — settle_sale_order is still
+-- what turns money into money.
+create or replace function set_consignment_line_sold(
+  p_sale_id uuid,
+  p_sold    boolean,
+  p_sold_at timestamptz default now()
+)
+returns sales
+language plpgsql
+security invoker
+set search_path = public
+as $fn$
+declare
+  v_sale sales;
+begin
+  update sales
+     set consignment_sold_at = case when p_sold then coalesce(consignment_sold_at, p_sold_at) end
+   where id = p_sale_id
+  returning * into v_sale;
+
+  if v_sale.id is null then
+    raise exception 'sale line % not found', p_sale_id;
+  end if;
+  return v_sale;
+end;
+$fn$;
+
 -- Consigned stock coming back unsold: the line is reversed and the units land
 -- in `p_to_location_id`. The sale row is deleted rather than zeroed, because it
 -- was never revenue and a zero-value row would still count as a garment sold in
@@ -272,3 +310,4 @@ grant execute on function log_sale_order(
 ) to authenticated, service_role;
 grant execute on function settle_sale_order(uuid, text, timestamptz) to authenticated, service_role;
 grant execute on function return_sale_order_line(uuid, uuid) to authenticated, service_role;
+grant execute on function set_consignment_line_sold(uuid, boolean, timestamptz) to authenticated, service_role;

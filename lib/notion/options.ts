@@ -142,11 +142,20 @@ export function payableOptions(options: string[]): string[] {
   return options.filter((o) => !sameOption(o, CONSIGNATION_PAYMENT));
 }
 
-/** Status values, matched case/accent-insensitively against the live list. */
+/**
+ * Status values, matched case/accent-insensitively against the live list.
+ *
+ * Status is a multi-select and they already use it for two things at once:
+ * one of paid/pending/gift, plus "SOLD" on consigned stock the shop has sold
+ * but not yet paid us for. 46 pieces are at Cybercafé on that convention as of
+ * 2026-09-19 — hence no separate "sold" column, which would split one fact
+ * across two places and strand the rows already tagged this way.
+ */
 export const STATUS = {
   paid: "Pago",
   pending: "Por pagar",
   gift: "Oferta",
+  sold: "SOLD",
 } as const;
 
 /**

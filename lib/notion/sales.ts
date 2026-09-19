@@ -24,8 +24,13 @@ export type NotionSaleItem = {
   /** Price of ONE garment, after the market discount. */
   unitPrice: number;
   quantity: number;
-  /** "Pago" | "Por pagar" | "Oferta" — matched against the DB's own options. */
-  status: string;
+  /**
+   * The tracker's Status values for this garment. Plural because Status is a
+   * multi-select carrying two independent facts: whether we have been paid
+   * ("Pago" / "Por pagar" / "Oferta") and, for consigned stock, whether the
+   * shop has sold it off the rail ("SOLD").
+   */
+  statuses: string[];
   /** Payment method label, e.g. "Cash", "Card (POS)", "Mbway André". */
   paymentMethod: string | null;
   /**
@@ -90,7 +95,7 @@ export async function createSalePagesWithSchema(
       { aliases: [...ALIASES.colour], value: item.colour },
       { aliases: [...ALIASES.sku], value: item.sku },
       { aliases: [...ALIASES.where], value: item.where || MARKET_WHERE },
-      { aliases: [...ALIASES.status], value: item.status },
+      { aliases: [...ALIASES.status], value: item.statuses },
       { aliases: [...ALIASES.payment], value: item.paymentMethod },
       { aliases: [...ALIASES.value], value: item.unitPrice },
       { aliases: [...ALIASES.quantity], value: 1 },

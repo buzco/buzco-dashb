@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { shopifyCdnResize } from "@/lib/shopify/image";
 import type { SaleOrderView } from "@/lib/sales/data";
-import { SettleForm, RetryNotionButton, ReturnLineButton } from "./order-actions";
+import { SettleForm, RetryNotionButton, ReturnLineButton, SoldToggle } from "./order-actions";
 
 // One order, collapsed to a single line until you want the detail.
 //
@@ -42,6 +42,9 @@ export function OrderBlock({
           {buyer ?? order.whereSold ?? "—"}
           <span className="ml-2 text-ink/40">
             {order.units} item{order.units === 1 ? "" : "s"}
+            {isConsignment && order.soldUnits > 0 && (
+              <span className="ml-2 text-status-received">{order.soldUnits} sold</span>
+            )}
           </span>
         </span>
 
@@ -93,7 +96,10 @@ export function OrderBlock({
                 €{line.netAmount.toFixed(2)}
               </span>
               {isConsignment && pending && (
-                <ReturnLineButton orderId={order.id} saleId={line.saleId} />
+                <>
+                  <SoldToggle orderId={order.id} saleId={line.saleId} sold={Boolean(line.soldAt)} />
+                  {!line.soldAt && <ReturnLineButton orderId={order.id} saleId={line.saleId} />}
+                </>
               )}
             </li>
           ))}
