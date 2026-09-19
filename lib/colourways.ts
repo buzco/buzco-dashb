@@ -23,10 +23,13 @@ export type Colourway = {
   aliases: string[];
 };
 
+// Names are English to match the storefront titles and the product handles.
+// The aliases carry the Portuguese, because the Notion tracker is kept by hand
+// in it — "Butterfly Preta" has to find a BWAF-BLK garment.
 export const COLOURWAYS: Colourway[] = [
   { token: "BEI", name: "Beige", aliases: ["beige", "bege"] },
-  { token: "BLK", name: "Preta", aliases: ["preta", "preto", "black", "noir"] },
-  { token: "PRP", name: "Roxa", aliases: ["roxa", "roxo", "purple", "purpura"] },
+  { token: "BLK", name: "Black", aliases: ["black", "preta", "preto", "noir"] },
+  { token: "PRP", name: "Purple", aliases: ["purple", "roxa", "roxo", "purpura"] },
 ];
 
 function normalise(s: string): string {
