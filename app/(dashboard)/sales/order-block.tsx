@@ -38,15 +38,18 @@ export function OrderBlock({
           {isConsignment ? "Consignation" : "Sale"}
         </span>
 
+        {/* Only the name truncates. The counts are the point of the row, so
+            they sit outside it and keep their width. */}
         <span className="min-w-0 flex-1 truncate text-bone">
           {buyer ?? order.whereSold ?? "—"}
-          <span className="ml-2 text-ink/40">
-            {order.units} item{order.units === 1 ? "" : "s"}
-            {isConsignment && order.soldUnits > 0 && (
-              <span className="ml-2 text-status-received">{order.soldUnits} sold</span>
-            )}
-          </span>
         </span>
+
+        <span className="shrink-0 text-ink/40">
+          {order.units} item{order.units === 1 ? "" : "s"}
+        </span>
+        {isConsignment && order.soldUnits > 0 && (
+          <span className="shrink-0 text-status-received">{order.soldUnits} sold</span>
+        )}
 
         <span
           className={`label-caps rounded-full border px-2.5 py-0.5 ${

@@ -49,6 +49,49 @@ function isConsignmentRow(payment: string, where: string): boolean {
   return sameOption(payment, CONSIGNATION_PAYMENT) || /cyber/i.test(where);
 }
 
+// The Butterfly longsleeve exists as THREE products with the identical name
+// ("Butterfly Thermal Waffle Longsleeve"), because that is how they came across
+// from Shopify. `variants.color` is null on all of them, so the only place the
+// colourway survives is the SKU: BWAF-BEI / BWAF-BLK / BWAF-PRP.
+//
+// The Notion tracker names them the other way round — "Butterfly Beige",
+// "Butterfly Preta", "Butterfly Roxa" — so a name match can never work. This
+// maps the tracker's colour word onto the SKU token instead.
+//
+// A stopgap, not a fix: the real repair is to put the colourway on the product
+// name or in variants.color, which would also stop the three showing as
+// indistinguishable cards in the sales logger.
+const COLOUR_SKU_TOKENS: Record<string, string> = {
+  beige: "BEI",
+  bege: "BEI",
+  preta: "BLK",
+  preto: "BLK",
+  black: "BLK",
+  roxa: "PRP",
+  roxo: "PRP",
+  purple: "PRP",
+  purpura: "PRP",
+};
+
+const norm = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+
+/**
+ * The colour word in a Notion product name, if it names one we can find in a
+ * SKU. Returns the SKU token to look for, e.g. "Butterfly Preta" -> "BLK".
+ */
+function colourTokenFor(notionProduct: string): string | null {
+  for (const word of norm(notionProduct).split(/\s+/)) {
+    const token = COLOUR_SKU_TOKENS[word];
+    if (token) return token;
+  }
+  return null;
+}
+
 export async function importNotionConsignments(
   supabase: SupabaseLike,
   options: { since: string; retailerId: string; dryRun?: boolean },
@@ -101,15 +144,42 @@ export async function importNotionConsignments(
   // reported rather than guessed at.
   const { data: variants } = await supabase
     .from("variants")
-    .select("id, size, products ( name )");
-  const variantKey = new Map<string, string>();
-  for (const v of (variants ?? []) as unknown as Array<{
+    .select("id, sku, size, products ( name )");
+  const allVariants = (variants ?? []) as unknown as Array<{
     id: string;
+    sku: string;
     size: string | null;
     products: { name: string } | null;
-  }>) {
+  }>;
+
+  const variantKey = new Map<string, string>();
+  for (const v of allVariants) {
     if (!v.products?.name) continue;
-    variantKey.set(`${v.products.name.toLowerCase()}|${(v.size ?? "").toLowerCase()}`, v.id);
+    variantKey.set(`${norm(v.products.name)}|${norm(v.size ?? "")}`, v.id);
+  }
+
+  /**
+   * Resolve a Notion product+size to a variant. Exact name first; failing that,
+   * the colourway route for products whose name collides (see COLOUR_SKU_TOKENS).
+   * An ambiguous colour match is reported rather than guessed at — picking one
+   * of two candidates would silently consign the wrong garment.
+   */
+  function findVariant(product: string, size: string): string | null {
+    const exact = variantKey.get(`${norm(product)}|${norm(size)}`);
+    if (exact) return exact;
+
+    const token = colourTokenFor(product);
+    if (!token) return null;
+
+    const firstWord = norm(product).split(/\s+/)[0];
+    const candidates = allVariants.filter(
+      (v) =>
+        v.products?.name &&
+        norm(v.products.name).startsWith(firstWord) &&
+        norm(v.size ?? "") === norm(size) &&
+        v.sku.toUpperCase().includes(token),
+    );
+    return candidates.length === 1 ? candidates[0].id : null;
   }
 
   const { data: location } = await supabase
@@ -138,7 +208,7 @@ export async function importNotionConsignments(
   for (const [date, drop] of [...byDate.entries()].sort()) {
     const matched: Array<{ row: NotionConsignRow; variantId: string }> = [];
     for (const row of drop) {
-      const variantId = variantKey.get(`${row.product.toLowerCase()}|${row.size.toLowerCase()}`);
+      const variantId = findVariant(row.product, row.size);
       if (!variantId) {
         const label = `${row.product} ${row.size}`.trim();
         if (!result.unmatched.includes(label)) result.unmatched.push(label);
