@@ -1,6 +1,10 @@
 import "server-only";
 
-import { createSalesOrder, markShopifyOrderPaid } from "@/lib/shopify/create-order";
+import {
+  cancelMarketOrder,
+  createSalesOrder,
+  markShopifyOrderPaid,
+} from "@/lib/shopify/create-order";
 import { isShopifyConfigured } from "@/lib/shopify/client";
 import { isNotionConfigured } from "@/lib/notion/client";
 import { mirrorUnsyncedForOrder, resyncOrderInNotion } from "@/lib/notion/mirror";
@@ -88,6 +92,19 @@ export async function recordSaleOrder(
     throw new Error("No Shopify stock location yet — run a Shopify sync first");
   }
 
+  // Preflight, because Shopify is written BEFORE the ledger: if the order
+  // tables aren't there, every attempt would create a real Shopify order and
+  // decrement real stock before discovering it has nowhere to record it. One
+  // cheap read up front turns that into a message. (It probes the table rather
+  // than the function because the two ship in the same migration, and probing
+  // an RPC means running it.)
+  const { error: preflight } = await supabase.from("sale_orders").select("id").limit(1);
+  if (preflight) {
+    throw new Error(
+      `The sales-order tables aren't in the database yet — apply migration 009 and try again. Nothing was sent to Shopify. (${preflight.message})`,
+    );
+  }
+
   const { data: variantRows, error: variantError } = await supabase
     .from("variants")
     .select("id, sku, shopify_variant_id")
@@ -166,11 +183,24 @@ export async function recordSaleOrder(
 
   if (error) {
     // Shopify has already decremented and there is no ledger row to hang a void
-    // on, so say which order to fix by hand rather than failing silently.
+    // on, so roll it back here. orderCancel restocks, which is the whole point:
+    // the alternative is stock quietly missing from Shopify for a sale that was
+    // never recorded anywhere.
+    if (!shopifyOrderId) throw new Error(error.message);
+
+    let rolledBack = false;
+    try {
+      await cancelMarketOrder(shopifyOrderId);
+      rolledBack = true;
+    } catch {
+      // Nothing to do but say so — the message below is the only way anyone
+      // finds out the order is still standing.
+    }
+
     throw new Error(
-      shopifyOrderName
-        ? `${error.message} — Shopify order ${shopifyOrderName} was created and needs cancelling by hand.`
-        : error.message,
+      rolledBack
+        ? `${error.message} — the Shopify order was cancelled and its stock put back.`
+        : `${error.message} — and Shopify order ${shopifyOrderName} could NOT be cancelled, so it is still holding that stock. Cancel it by hand.`,
     );
   }
   if (!order) throw new Error("The order was not recorded");

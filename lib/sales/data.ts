@@ -234,12 +234,26 @@ export async function loadSalesTotals(): Promise<SalesTotals> {
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  const [{ data: monthSales }, { data: unsynced }, pendingOrders] = await Promise.all([
+  const [{ data: monthSales }, unsyncedCount, pendingOrders] = await Promise.all([
     supabase
       .from("sales")
       .select("quantity, net_amount, sold_at")
       .gte("sold_at", startOfMonth),
-    supabase.from("sales").select("id").is("notion_page_id", null),
+    // Only lines that BELONG TO AN ORDER, because the banner this feeds tells
+    // you to open the order and press Retry — and that button only exists on an
+    // order. Counting every unmirrored row would permanently show the hundreds
+    // of imported Shopify sales that were never meant to go to Notion, which is
+    // a number nobody can act on.
+    (async () => {
+      const { data, error } = await supabase
+        .from("sales")
+        .select("id")
+        .is("notion_page_id", null)
+        .not("sale_order_id", "is", null);
+      // Pre-migration-009 the column isn't there; nothing has an order yet either.
+      if (error) return 0;
+      return (data ?? []).length;
+    })(),
     loadSaleOrders({ pendingOnly: true }),
   ]);
 
@@ -252,7 +266,7 @@ export async function loadSalesTotals(): Promise<SalesTotals> {
     monthUnits: rows.reduce((n, s) => n + s.quantity, 0),
     outstanding: pendingOrders.reduce((n, o) => n + o.net, 0),
     outstandingOrders: pendingOrders.length,
-    unsyncedNotion: (unsynced ?? []).length,
+    unsyncedNotion: unsyncedCount,
   };
 }
 

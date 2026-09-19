@@ -129,6 +129,19 @@ export function clearSalesOptionsCache(): void {
  */
 export const CONSIGNATION_PAYMENT = "Consignation";
 
+/**
+ * The payment options worth OFFERING a person.
+ *
+ * "Consignation" is dropped: it is the marker the app writes itself while a
+ * batch is unpaid, so picking it for money actually received would record
+ * "paid with Consignation", and picking it when settling would undo the very
+ * thing settling is for. It stays in the list Notion keeps and in what the
+ * mirror writes — it just isn't a choice.
+ */
+export function payableOptions(options: string[]): string[] {
+  return options.filter((o) => !sameOption(o, CONSIGNATION_PAYMENT));
+}
+
 /** Status values, matched case/accent-insensitively against the live list. */
 export const STATUS = {
   paid: "Pago",
@@ -137,18 +150,29 @@ export const STATUS = {
 } as const;
 
 /**
+ * Notion's options are typed by hand, so "Mbway André" and "MBWay Andre " are
+ * the same option to a person. Comparisons here ignore case, accents, spacing
+ * and punctuation for that reason.
+ */
+function normalizeOption(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Whether two option labels mean the same thing. */
+export function sameOption(a: string, b: string): boolean {
+  return normalizeOption(a) === normalizeOption(b);
+}
+
+/**
  * Pick the live option that means the same thing as `wanted`, so the app writes
  * the tracker's own spelling. Falls back to `wanted` — Notion will create it,
  * which is the right outcome when the option genuinely doesn't exist yet.
  */
 export function matchOption(options: string[], wanted: string): string {
-  const norm = (s: string) =>
-    s
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  const target = norm(wanted);
-  return options.find((o) => norm(o) === target) ?? wanted;
+  return options.find((o) => sameOption(o, wanted)) ?? wanted;
 }

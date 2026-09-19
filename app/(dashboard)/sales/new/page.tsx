@@ -1,6 +1,6 @@
 import { loadSaleCatalog } from "@/lib/sales/catalog";
 import { loadCustomers } from "@/lib/sales/data";
-import { getSalesOptions } from "@/lib/notion/options";
+import { getSalesOptions, payableOptions } from "@/lib/notion/options";
 import { isNotionConfigured } from "@/lib/notion/client";
 import { isShopifyConfigured } from "@/lib/shopify/client";
 import { SaleWizard } from "./sale-wizard";
@@ -23,7 +23,7 @@ export default async function NewSalePage() {
       products={products}
       customers={customers}
       whereOptions={options.where}
-      paymentOptions={options.payment}
+      paymentOptions={payableOptions(options.payment)}
       optionsAreLive={options.live && notionConfigured}
       notionConfigured={notionConfigured}
       shopifyConfigured={isShopifyConfigured()}

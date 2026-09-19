@@ -434,17 +434,23 @@ function SizePicker({
               type="button"
               disabled={left <= 0}
               onClick={() => onAdd(v)}
+              // Taking the last one looks different from never having had it:
+              // both are untappable, but "you have all 2" is a success and
+              // "sold out" is a dead end, and a struck-through chip for the
+              // first reads like the sale just failed.
               className={`rounded-lg border px-2 py-4 transition-colors ${
-                left <= 0
-                  ? "border-line text-ink/25 line-through"
-                  : taken > 0
-                    ? "border-ink bg-ink/10 text-ink"
+                taken > 0
+                  ? "border-ink bg-ink/10 text-ink"
+                  : left <= 0
+                    ? "border-line text-ink/25 line-through"
                     : "border-line text-bone hover:border-ink/60"
               }`}
             >
               <span className="block text-lg font-medium">{sizeLabel(v)}</span>
-              <span className="label-caps block font-mono text-ink/50">
-                {left} left{taken > 0 ? ` · ${taken} in cart` : ""}
+              <span
+                className={`label-caps block font-mono ${taken > 0 ? "text-ink/70" : "text-ink/50"}`}
+              >
+                {taken > 0 ? `${taken} in cart · ${left} left` : `${left} left`}
               </span>
             </button>
           );
@@ -1010,8 +1016,11 @@ function BottomBar({
             {units} item{units === 1 ? "" : "s"}
           </p>
           <p className="font-mono text-xl tabular-nums text-bone">{euro(total)}</p>
+          {/* Not truncated: an error here is the only place the seller learns
+              why nothing was recorded, and the useful half of the sentence is
+              always the end of it. */}
           {(blocker || error) && (
-            <p className={`truncate text-xs ${error ? "text-status-cancelled" : "text-ink/40"}`}>
+            <p className={`text-xs ${error ? "text-status-cancelled" : "truncate text-ink/40"}`}>
               {error ?? blocker}
             </p>
           )}

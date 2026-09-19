@@ -36,8 +36,8 @@ export default async function SalesPage() {
 
       {isNotionConfigured() && totals.unsyncedNotion > 0 && (
         <p className="rounded-md border border-status-ordered/50 bg-status-ordered/5 px-4 py-3 text-sm text-status-ordered">
-          {totals.unsyncedNotion} sale row{totals.unsyncedNotion === 1 ? "" : "s"} haven&apos;t reached
-          Notion. Open the order below and press Retry.
+          {totals.unsyncedNotion} order line{totals.unsyncedNotion === 1 ? "" : "s"}
+          {" haven't reached Notion. Open the order below and press Retry."}
         </p>
       )}
 
