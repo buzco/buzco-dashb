@@ -17,15 +17,21 @@ export default async function ConsignmentsSubTabPage() {
   const open = orders.filter((o) => o.paymentStatus === "pending");
   const settled = orders.filter((o) => o.paymentStatus === "paid");
 
-  const outstanding = open.reduce((n, o) => n + o.net, 0);
+  // Two different numbers, and conflating them overstates what a shop owes:
+  // everything out there is ours until it sells, but only what HAS sold is a
+  // debt — the rest can come back.
+  const valueOut = open.reduce((n, o) => n + o.net, 0);
+  const owed = open.reduce((n, o) => n + o.owed, 0);
   const unitsOut = open.reduce((n, o) => n + o.units, 0);
+  const unitsSold = open.reduce((n, o) => n + o.soldUnits, 0);
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Open" value={String(open.length)} />
-        <Stat label="Units out" value={String(unitsOut)} />
-        <Stat label="Owed to us" value={`€${outstanding.toFixed(2)}`} accent />
+        <Stat label="Units out" value={`${unitsOut}`} hint={`${unitsSold} sold`} />
+        <Stat label="Value out there" value={`€${valueOut.toFixed(2)}`} />
+        <Stat label="Owed to us" value={`€${owed.toFixed(2)}`} accent />
       </div>
 
       <section className="space-y-3">
@@ -61,13 +67,24 @@ export default async function ConsignmentsSubTabPage() {
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Stat({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  accent?: boolean;
+}) {
   return (
     <div className="rounded-lg border border-line bg-surface p-3">
       <p className="label-caps text-ink/40">{label}</p>
       <p className={`font-mono text-2xl tabular-nums ${accent ? "text-ink" : "text-bone"}`}>
         {value}
       </p>
+      {hint && <p className="label-caps text-ink/40">{hint}</p>}
     </div>
   );
 }

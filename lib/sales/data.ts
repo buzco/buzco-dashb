@@ -56,6 +56,12 @@ export type SaleOrderView = {
   unsyncedNotion: number;
   /** Pieces the shop has already sold, on a consignation. */
   soldUnits: number;
+  /**
+   * What is actually OWED right now. For a consignation that is the sold
+   * pieces only — the rest is stock on loan, which the shop can hand back.
+   * For anything else the whole order is owed once it is pending.
+   */
+  owed: number;
 };
 
 type OrderRow = {
@@ -210,6 +216,12 @@ export async function loadSaleOrders(options: LoadOptions = {}): Promise<SaleOrd
       net: lines.reduce((n, l) => n + l.netAmount, 0),
       unsyncedNotion: lines.filter((l) => !l.notionPageId).length,
       soldUnits: lines.filter((l) => l.soldAt).reduce((n, l) => n + l.quantity, 0),
+      owed:
+        o.payment_status !== "pending"
+          ? 0
+          : o.kind === "consignment"
+            ? lines.filter((l) => l.soldAt).reduce((n, l) => n + l.netAmount, 0)
+            : lines.reduce((n, l) => n + l.netAmount, 0),
     };
   });
 }
@@ -270,7 +282,7 @@ export async function loadSalesTotals(): Promise<SalesTotals> {
       .reduce((n, s) => n + Number(s.net_amount), 0),
     monthNet: rows.reduce((n, s) => n + Number(s.net_amount), 0),
     monthUnits: rows.reduce((n, s) => n + s.quantity, 0),
-    outstanding: pendingOrders.reduce((n, o) => n + o.net, 0),
+    outstanding: pendingOrders.reduce((n, o) => n + o.owed, 0),
     outstandingOrders: pendingOrders.length,
     unsyncedNotion: unsyncedCount,
   };

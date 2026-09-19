@@ -110,6 +110,13 @@ export function buildConsignmentNote(order: SaleOrderView): Uint8Array {
     doc.text(truncate(line.productName, 36), cols.item, y, { size: 10 });
     doc.text(line.size ?? line.color ?? "—", cols.size, y, { size: 10 });
     doc.text(truncate(line.sku, 16), cols.sku, y, { size: 9, font: "mono", gray: 0.4 });
+    if (line.soldAt) {
+      // Marks what the shop has already shifted, so a settlement conversation
+      // has the same list on both sides of the table. On the row's OWN
+      // baseline: set below it, at half the row spacing, it read as belonging
+      // to the line underneath.
+      doc.text("sold", cols.size - 10, y, { size: 8, gray: 0.5, align: "right" });
+    }
     doc.text(String(line.quantity), cols.qtyRight, y, { size: 10, font: "mono", align: "right" });
     doc.text(line.isFreebie ? "free" : euro(unit), cols.unitRight, y, {
       size: 10,
@@ -125,7 +132,9 @@ export function buildConsignmentNote(order: SaleOrderView): Uint8Array {
   y += 18;
 
   // --- Totals ---
-  const totalsX = right - 120;
+  // Wide enough for the longest label ("Due for pieces sold" in bold) plus a
+  // four-figure amount. At 120 the two ran into each other.
+  const totalsX = right - 210;
   doc.text("Pieces", totalsX, y, { size: 9, gray: 0.45 });
   doc.text(String(order.units), right, y, { size: 10, font: "mono", align: "right" });
   y += 15;
@@ -144,12 +153,25 @@ export function buildConsignmentNote(order: SaleOrderView): Uint8Array {
     y += 15;
   }
 
-  doc.text(order.paymentStatus === "paid" ? "Total paid" : "Total due", totalsX, y + 2, {
-    size: 10,
-    font: "bold",
-  });
+  // "Total due" would be wrong on a note that travels WITH the delivery: none
+  // of it is owed until the shop sells it. The batch's value is stated, and what
+  // is actually owed only appears once something has sold.
+  const label =
+    order.paymentStatus === "paid"
+      ? "Total paid"
+      : order.kind === "consignment"
+        ? "Value of goods"
+        : "Total due";
+  doc.text(label, totalsX, y + 2, { size: 10, font: "bold" });
   doc.text(euro(order.net), right, y + 2, { size: 12, font: "mono", align: "right" });
-  y += 34;
+  y += 20;
+
+  if (order.paymentStatus === "pending" && order.owed > 0) {
+    doc.text("Due for pieces sold", totalsX, y + 2, { size: 10, font: "bold" });
+    doc.text(euro(order.owed), right, y + 2, { size: 12, font: "mono", align: "right" });
+    y += 20;
+  }
+  y += 14;
 
   // --- Terms ---
   if (y > PAGE_BOTTOM - 140) y = doc.newPage();

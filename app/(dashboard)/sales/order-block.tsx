@@ -23,49 +23,55 @@ export function OrderBlock({
 
   return (
     <details className="group overflow-hidden rounded-lg border border-line bg-surface">
-      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-3">
-        <span className="label-caps text-ink/30 transition-transform group-open:rotate-90">›</span>
+      {/* Two lines rather than one wrapping row: who and how much on top,
+          the counts underneath. Squeezed onto a single line the customer name
+          was the thing that collapsed, which is the one field you scan for. */}
+      <summary className="cursor-pointer list-none p-3">
+        <div className="flex items-center gap-x-3">
+          <span className="label-caps shrink-0 text-ink/30 transition-transform group-open:rotate-90">
+            ›
+          </span>
 
-        <span className="font-mono text-sm tabular-nums text-ink">{order.reference}</span>
+          <span className="shrink-0 font-mono text-sm tabular-nums text-ink">
+            {order.reference}
+          </span>
 
-        <span
-          className={`label-caps rounded-full border px-2.5 py-0.5 ${
-            isConsignment
-              ? "border-status-settled text-status-settled"
-              : "border-status-active text-status-active"
-          }`}
-        >
-          {isConsignment ? "Consignation" : "Sale"}
-        </span>
+          <span className="min-w-0 flex-1 truncate text-bone">
+            {buyer ?? order.whereSold ?? "—"}
+          </span>
 
-        {/* Only the name truncates. The counts are the point of the row, so
-            they sit outside it and keep their width. */}
-        <span className="min-w-0 flex-1 truncate text-bone">
-          {buyer ?? order.whereSold ?? "—"}
-        </span>
+          <span
+            className={`label-caps shrink-0 rounded-full border px-2.5 py-0.5 ${
+              pending
+                ? "border-status-ordered text-status-ordered"
+                : "border-status-received text-status-received"
+            }`}
+          >
+            {pending ? "Pending" : "Paid"}
+          </span>
 
-        <span className="shrink-0 text-ink/40">
-          {order.units} item{order.units === 1 ? "" : "s"}
-        </span>
-        {isConsignment && order.soldUnits > 0 && (
-          <span className="shrink-0 text-status-received">{order.soldUnits} sold</span>
-        )}
+          {/* On a consignation the big number is what's OWED; the value of the
+              whole batch sits behind it, because most of it can come back. */}
+          <span className="shrink-0 font-mono tabular-nums text-bone">
+            €{(isConsignment && pending ? order.owed : order.net).toFixed(2)}
+            {isConsignment && pending && order.owed !== order.net && (
+              <span className="ml-1 text-ink/40">/ €{order.net.toFixed(2)}</span>
+            )}
+          </span>
+        </div>
 
-        <span
-          className={`label-caps rounded-full border px-2.5 py-0.5 ${
-            pending
-              ? "border-status-ordered text-status-ordered"
-              : "border-status-received text-status-received"
-          }`}
-        >
-          {pending ? "Pending" : "Paid"}
-        </span>
-
-        <span className="font-mono tabular-nums text-bone">€{order.net.toFixed(2)}</span>
-
-        <span className="label-caps w-full text-ink/40 sm:w-auto">
-          {new Date(order.createdAt).toLocaleDateString()}
-        </span>
+        <div className="label-caps mt-1 flex flex-wrap items-center gap-x-3 pl-6 text-ink/40">
+          <span className={isConsignment ? "text-status-settled" : "text-status-active"}>
+            {isConsignment ? "Consignation" : "Sale"}
+          </span>
+          <span>
+            {order.units} item{order.units === 1 ? "" : "s"}
+          </span>
+          {isConsignment && order.soldUnits > 0 && (
+            <span className="text-status-received">{order.soldUnits} sold</span>
+          )}
+          <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+        </div>
       </summary>
 
       <div className="space-y-4 border-t border-line p-3">
