@@ -21,13 +21,23 @@ export default async function ProductsPage() {
 
   const locationName = new Map((locations ?? []).map((l) => [l.id, `${l.name}`]));
 
-  // stock per variant -> [{location, qty}]
-  const stockByVariant = new Map<string, { name: string; qty: number }[]>();
+  // The location mirroring Shopify is the one worth editing: it is where the
+  // stock actually is, and correcting it writes through to Shopify. Everything
+  // else (a market crate, a retailer) is shown for context only, because those
+  // move by transfer rather than by typing a new number.
+  const stockCentre = (locations ?? []).find((l) => l.type === "shopify") ?? null;
+
+  const centreQtyByVariant = new Map<string, number>();
+  const otherStockByVariant = new Map<string, { name: string; qty: number }[]>();
   for (const s of stock ?? []) {
+    if (stockCentre && s.location_id === stockCentre.id) {
+      centreQtyByVariant.set(s.variant_id, s.quantity);
+      continue;
+    }
     if (!s.quantity) continue;
-    const arr = stockByVariant.get(s.variant_id) ?? [];
+    const arr = otherStockByVariant.get(s.variant_id) ?? [];
     arr.push({ name: locationName.get(s.location_id) ?? "—", qty: s.quantity });
-    stockByVariant.set(s.variant_id, arr);
+    otherStockByVariant.set(s.variant_id, arr);
   }
 
   const variantsByProduct = new Map<string, typeof variants>();
@@ -39,12 +49,17 @@ export default async function ProductsPage() {
 
   const catalog: CatalogProduct[] = (products ?? []).map((p) => {
     const pv = variantsByProduct.get(p.id) ?? [];
+    // Every variant gets a row, including the ones sitting at zero — those are
+    // exactly the ones someone opens this popup to put a number back into.
     const stockRows = pv.map((v) => {
-      const locs = stockByVariant.get(v.id) ?? [];
+      const others = otherStockByVariant.get(v.id) ?? [];
+      const centreQty = centreQtyByVariant.get(v.id) ?? 0;
       return {
+        variantId: v.id,
         label: variantLabel(v),
-        locations: locs,
-        total: locs.reduce((s, l) => s + l.qty, 0),
+        centreQty,
+        others,
+        total: centreQty + others.reduce((s, l) => s + l.qty, 0),
       };
     });
     return {
@@ -73,7 +88,12 @@ export default async function ProductsPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {catalog.map((product) => (
-            <CatalogCard key={product.id} product={product} />
+            <CatalogCard
+              key={product.id}
+              product={product}
+              stockLocationId={stockCentre?.id ?? null}
+              stockLocationName={stockCentre?.name ?? "stock"}
+            />
           ))}
         </div>
       )}
