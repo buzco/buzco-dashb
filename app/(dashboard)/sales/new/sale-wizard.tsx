@@ -383,6 +383,11 @@ function ItemsStep({
               </div>
               <div className="flex flex-1 flex-col gap-1 p-3">
                 <p className="text-sm font-medium leading-tight text-bone">{product.name}</p>
+                {/* Three Butterfly products share one name; without this they
+                    are three identical cards. */}
+                {product.colourway && (
+                  <p className="label-caps text-pink">{product.colourway}</p>
+                )}
                 <p className="font-mono text-base tabular-nums text-ink">
                   {product.price != null ? euro(product.price) : "—"}
                 </p>
@@ -416,7 +421,10 @@ function SizePicker({
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-bone">{product.name}</p>
+          <p className="font-medium text-bone">
+            {product.name}
+            {product.colourway && <span className="ml-2 text-pink">{product.colourway}</span>}
+          </p>
           <p className="label-caps text-ink/50">Pick a size — tap again to add another</p>
         </div>
         <button type="button" onClick={onDone} className="label-caps text-ink/60">

@@ -27,6 +27,11 @@ export type SaleVariantView = {
 export type SaleProductView = {
   productId: string;
   name: string;
+  /**
+   * Set when every variant shares a colour the product NAME does not mention —
+   * the three Butterfly longsleeves, which are otherwise three identical cards.
+   */
+  colourway: string | null;
   imageUrl: string | null;
   price: number | null;
   variants: SaleVariantView[];
@@ -96,6 +101,7 @@ export async function loadSaleCatalog(): Promise<SaleProductView[]> {
       entry = {
         productId: v.product_id,
         name: product?.name ?? "Unknown product",
+        colourway: null,
         imageUrl: product?.image_url ?? null,
         price: null,
         variants: [],
@@ -124,6 +130,14 @@ export async function loadSaleCatalog(): Promise<SaleProductView[]> {
     // A product with nothing left anywhere is noise on a phone screen.
     .filter((p) => p.available > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
-  for (const p of list) p.variants.sort(bySize);
+  for (const p of list) {
+    p.variants.sort(bySize);
+    // Only worth showing when it actually disambiguates: one colour across the
+    // product, and a name that does not already say it.
+    const colours = [...new Set(p.variants.map((v) => v.color).filter(Boolean))] as string[];
+    if (colours.length === 1 && !p.name.toLowerCase().includes(colours[0].toLowerCase())) {
+      p.colourway = colours[0];
+    }
+  }
   return list;
 }

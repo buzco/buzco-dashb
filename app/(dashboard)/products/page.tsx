@@ -62,9 +62,18 @@ export default async function ProductsPage() {
         total: centreQty + others.reduce((s, l) => s + l.qty, 0),
       };
     });
+    // One colour across every variant, not already in the name, is the only
+    // thing telling the three Butterfly products apart.
+    const colours = [...new Set(pv.map((v) => v.color).filter(Boolean))] as string[];
+    const colourway =
+      colours.length === 1 && !p.name.toLowerCase().includes(colours[0].toLowerCase())
+        ? colours[0]
+        : null;
+
     return {
       id: p.id,
       name: p.name,
+      colourway,
       status: p.status,
       imageUrl: p.image_url,
       variantCount: pv.length,

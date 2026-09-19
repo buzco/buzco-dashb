@@ -2,6 +2,7 @@ import "server-only";
 
 import { shopifyGraphQL } from "@/lib/shopify/client";
 import { createClient } from "@/lib/supabase/server";
+import { colourFromSku } from "@/lib/colourways";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Import / reconcile the Shopify catalog into our DB. This DB stays the source
@@ -259,7 +260,13 @@ export async function syncFromShopify(db?: SupabaseClient): Promise<SyncResult> 
         // --- Upsert each variant, then sync cost + inventory ---
         for (const { node: v } of p.variants.edges) {
           const size = optionValue(v.selectedOptions, /size/i);
-          const color = optionValue(v.selectedOptions, /colou?r/i);
+          // Shopify only reports a colour when the product carries a Colour
+          // option, and the Butterfly longsleeves don't — they are three
+          // separate products with the same title, told apart by their SKU.
+          // Falling back to the SKU is what stops them arriving here as three
+          // indistinguishable products with a null colour.
+          const color =
+            optionValue(v.selectedOptions, /colou?r/i) ?? colourFromSku(v.sku);
           const sku = (v.sku && v.sku.trim()) || `SH-${v.id.split("/").pop()}`;
           const retail_price = v.price != null ? Number(v.price) : null;
           const unitCost =

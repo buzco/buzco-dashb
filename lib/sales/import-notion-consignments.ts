@@ -2,6 +2,7 @@ import "server-only";
 
 import { queryDatabaseAll, salesDbId, plainText, multiSelectNames } from "@/lib/notion/client";
 import { CONSIGNATION_PAYMENT, STATUS, sameOption } from "@/lib/notion/options";
+import { colourTokenFromText } from "@/lib/colourways";
 import type { createClient } from "@/lib/supabase/server";
 
 // Backfills consignations that were recorded in Notion by hand, before the app
@@ -49,48 +50,12 @@ function isConsignmentRow(payment: string, where: string): boolean {
   return sameOption(payment, CONSIGNATION_PAYMENT) || /cyber/i.test(where);
 }
 
-// The Butterfly longsleeve exists as THREE products with the identical name
-// ("Butterfly Thermal Waffle Longsleeve"), because that is how they came across
-// from Shopify. `variants.color` is null on all of them, so the only place the
-// colourway survives is the SKU: BWAF-BEI / BWAF-BLK / BWAF-PRP.
-//
-// The Notion tracker names them the other way round — "Butterfly Beige",
-// "Butterfly Preta", "Butterfly Roxa" — so a name match can never work. This
-// maps the tracker's colour word onto the SKU token instead.
-//
-// A stopgap, not a fix: the real repair is to put the colourway on the product
-// name or in variants.color, which would also stop the three showing as
-// indistinguishable cards in the sales logger.
-const COLOUR_SKU_TOKENS: Record<string, string> = {
-  beige: "BEI",
-  bege: "BEI",
-  preta: "BLK",
-  preto: "BLK",
-  black: "BLK",
-  roxa: "PRP",
-  roxo: "PRP",
-  purple: "PRP",
-  purpura: "PRP",
-};
-
 const norm = (s: string) =>
   s
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .trim();
-
-/**
- * The colour word in a Notion product name, if it names one we can find in a
- * SKU. Returns the SKU token to look for, e.g. "Butterfly Preta" -> "BLK".
- */
-function colourTokenFor(notionProduct: string): string | null {
-  for (const word of norm(notionProduct).split(/\s+/)) {
-    const token = COLOUR_SKU_TOKENS[word];
-    if (token) return token;
-  }
-  return null;
-}
 
 export async function importNotionConsignments(
   supabase: SupabaseLike,
@@ -160,7 +125,7 @@ export async function importNotionConsignments(
 
   /**
    * Resolve a Notion product+size to a variant. Exact name first; failing that,
-   * the colourway route for products whose name collides (see COLOUR_SKU_TOKENS).
+   * the colourway route for products whose name collides (see lib/colourways.ts).
    * An ambiguous colour match is reported rather than guessed at — picking one
    * of two candidates would silently consign the wrong garment.
    */
@@ -168,7 +133,9 @@ export async function importNotionConsignments(
     const exact = variantKey.get(`${norm(product)}|${norm(size)}`);
     if (exact) return exact;
 
-    const token = colourTokenFor(product);
+    // Three Butterfly products share one title; the colourway is only in the
+    // SKU. See lib/colourways.ts.
+    const token = colourTokenFromText(product);
     if (!token) return null;
 
     const firstWord = norm(product).split(/\s+/)[0];

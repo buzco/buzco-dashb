@@ -20,6 +20,8 @@ export type StockRow = {
 export type CatalogProduct = {
   id: string;
   name: string;
+  /** Shown when the name alone does not tell two products apart. */
+  colourway: string | null;
   status: string;
   imageUrl: string | null;
   variantCount: number;
@@ -69,6 +71,7 @@ export function CatalogCard({
         <div className="flex items-start justify-between gap-2">
           <Link href={`/products/${product.id}`} className="font-medium text-bone hover:underline">
             {product.name}
+            {product.colourway && <span className="ml-2 text-pink">{product.colourway}</span>}
           </Link>
           <Badge status={product.status} />
         </div>
