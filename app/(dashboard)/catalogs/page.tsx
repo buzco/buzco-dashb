@@ -9,7 +9,7 @@ export default async function CatalogsPage() {
   const supabase = await createClient();
   const { data: catalogs } = await supabase
     .from("catalogs")
-    .select("id, name, notes, created_at")
+    .select("id, name, notes, retailer_id, created_at")
     .order("created_at", { ascending: false });
 
   const ids = (catalogs ?? []).map((c) => c.id);
@@ -19,6 +19,12 @@ export default async function CatalogsPage() {
   const counts = new Map<string, number>();
   for (const it of items ?? []) counts.set(it.catalog_id, (counts.get(it.catalog_id) ?? 0) + 1);
 
+  const retailerIds = [...new Set((catalogs ?? []).map((c) => c.retailer_id).filter(Boolean))];
+  const { data: retailers } = retailerIds.length
+    ? await supabase.from("retailers").select("id, name").in("id", retailerIds as string[])
+    : { data: [] };
+  const retailerNameById = new Map((retailers ?? []).map((r) => [r.id, r.name]));
+
   return (
     <div className="space-y-10">
       <div>
@@ -26,7 +32,8 @@ export default async function CatalogsPage() {
         <p className="mt-2 max-w-2xl text-sm text-ink/50">
           A line sheet is the priced selection you send a shop or boutique — pick the
           pieces, set wholesale prices as a % of RRP, then draft the outreach email.
-          This is the B2B side; it never touches storefront pricing.
+          This is the B2B side; it never touches storefront pricing. Attach a sheet
+          to a shop and the sales wizard prices that shop's orders from it.
         </p>
       </div>
 
@@ -37,6 +44,7 @@ export default async function CatalogsPage() {
           <thead>
             <tr>
               <Th>Name</Th>
+              <Th>Agreed with</Th>
               <Th className="text-right">Items</Th>
               <Th>Notes</Th>
             </tr>
@@ -48,6 +56,9 @@ export default async function CatalogsPage() {
                   <Link href={`/catalogs/${c.id}`} className="text-bone underline-offset-2 hover:underline">
                     {c.name}
                   </Link>
+                </Td>
+                <Td className="text-ink/70">
+                  {c.retailer_id ? (retailerNameById.get(c.retailer_id) ?? "—") : "—"}
                 </Td>
                 <Td className="text-right font-mono tabular-nums">{counts.get(c.id) ?? 0}</Td>
                 <Td className="text-ink/70">{c.notes ?? "—"}</Td>

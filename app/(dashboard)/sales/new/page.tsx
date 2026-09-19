@@ -1,5 +1,5 @@
 import { loadSaleCatalog } from "@/lib/sales/catalog";
-import { loadCustomers } from "@/lib/sales/data";
+import { loadCustomers, loadPriceLists } from "@/lib/sales/data";
 import { getSalesOptions, payableOptions } from "@/lib/notion/options";
 import { isNotionConfigured } from "@/lib/notion/client";
 import { isShopifyConfigured } from "@/lib/shopify/client";
@@ -12,9 +12,10 @@ import { SaleWizard } from "./sale-wizard";
 export default async function NewSalePage() {
   const notionConfigured = isNotionConfigured();
 
-  const [products, customers, options] = await Promise.all([
+  const [products, customers, priceLists, options] = await Promise.all([
     loadSaleCatalog(),
     loadCustomers(),
+    loadPriceLists(),
     getSalesOptions(),
   ]);
 
@@ -22,6 +23,7 @@ export default async function NewSalePage() {
     <SaleWizard
       products={products}
       customers={customers}
+      priceLists={priceLists}
       whereOptions={options.where}
       paymentOptions={payableOptions(options.payment)}
       optionsAreLive={options.live && notionConfigured}

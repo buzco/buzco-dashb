@@ -635,6 +635,7 @@ export interface Database {
           id: string;
           name: string;
           notes: string | null;
+          retailer_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -642,6 +643,7 @@ export interface Database {
           id?: string;
           name: string;
           notes?: string | null;
+          retailer_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -649,6 +651,7 @@ export interface Database {
           id?: string;
           name?: string;
           notes?: string | null;
+          retailer_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

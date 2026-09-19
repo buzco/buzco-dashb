@@ -10,6 +10,7 @@ import {
   type SaleOrderState,
 } from "@/lib/actions/sales";
 import type { SaleProductView, SaleVariantView } from "@/lib/sales/catalog";
+import { priceFor, repriceCart, type PriceList } from "@/lib/sales/pricing";
 
 // The till. Built for a phone held in one hand at a market or in a shop's back
 // room: pictures rather than SKUs, one question per screen, and nothing that
@@ -30,6 +31,10 @@ type CartLine = {
   size: string | null;
   color: string | null;
   unitPrice: number;
+  /** RRP, kept so clearing the customer can put the line back. */
+  retailPrice: number;
+  /** Set once the seller types a price over the one the sheet suggested. */
+  priceEdited: boolean;
   quantity: number;
   freebie: boolean;
   available: number;
@@ -49,6 +54,7 @@ function sizeLabel(v: { size: string | null; color: string | null; sku: string }
 export function SaleWizard({
   products,
   customers,
+  priceLists,
   whereOptions,
   paymentOptions,
   optionsAreLive,
@@ -57,6 +63,8 @@ export function SaleWizard({
 }: {
   products: SaleProductView[];
   customers: CustomerOption[];
+  /** Each shop's agreed prices, keyed by retailer id. */
+  priceLists: Record<string, PriceList>;
   whereOptions: string[];
   paymentOptions: string[];
   optionsAreLive: boolean;
@@ -83,6 +91,11 @@ export function SaleWizard({
   const [pending, startTransition] = useTransition();
 
   const isConsignment = kind === "consignment";
+
+  // Wholesale prices are negotiated per shop, not derived from RRP, so the
+  // sheet the buyer is on IS the price. With nobody picked there is no sheet
+  // and the cart stays at retail.
+  const priceList = (retailerId && priceLists[retailerId]) || null;
 
   const visibleProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -121,6 +134,7 @@ export function SaleWizard({
           l.variantId === variant.variantId ? { ...l, quantity: l.quantity + 1 } : l,
         );
       }
+      const retail = variant.price ?? product.price ?? 0;
       return [
         ...prev,
         {
@@ -131,7 +145,9 @@ export function SaleWizard({
           sku: variant.sku,
           size: variant.size,
           color: variant.color,
-          unitPrice: variant.price ?? product.price ?? 0,
+          unitPrice: priceFor(variant.variantId, retail, priceList).unitPrice,
+          retailPrice: retail,
+          priceEdited: false,
           quantity: 1,
           freebie: false,
           available: variant.available,
@@ -146,6 +162,14 @@ export function SaleWizard({
 
   function removeLine(variantId: string) {
     setCart((prev) => prev.filter((l) => l.variantId !== variantId));
+  }
+
+  // The cart is filled BEFORE the buyer is asked for, so picking a shop has to
+  // reach back and reprice what's already in it. Lines the seller priced by
+  // hand are left alone — see repriceCart.
+  function chooseRetailer(id: string) {
+    setRetailerId(id);
+    setCart((prev) => repriceCart(prev, (id && priceLists[id]) || null));
   }
 
   const customer = customerList.find((c) => c.id === retailerId) ?? null;
@@ -235,12 +259,15 @@ export function SaleWizard({
           required={isConsignment}
           customers={customerList}
           retailerId={retailerId}
-          onRetailer={setRetailerId}
+          onRetailer={chooseRetailer}
+          priceList={priceList}
+          cartUnits={units}
           customerName={customerName}
           onCustomerName={setCustomerName}
           onCreated={(c) => {
             setCustomerList((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
-            setRetailerId(c.id);
+            // A brand-new shop has no sheet yet, so this puts the cart back to RRP.
+            chooseRetailer(c.id);
           }}
         />
       )}
@@ -260,6 +287,7 @@ export function SaleWizard({
       {step === 4 && (
         <ConfirmStep
           cart={cart}
+          priceList={priceList}
           kind={kind}
           where={where}
           buyer={buyerLabel}
@@ -531,6 +559,8 @@ function CustomerStep({
   customers,
   retailerId,
   onRetailer,
+  priceList,
+  cartUnits,
   customerName,
   onCustomerName,
   onCreated,
@@ -539,6 +569,8 @@ function CustomerStep({
   customers: CustomerOption[];
   retailerId: string;
   onRetailer: (id: string) => void;
+  priceList: PriceList | null;
+  cartUnits: number;
   customerName: string;
   onCustomerName: (n: string) => void;
   onCreated: (c: CustomerOption) => void;
@@ -586,6 +618,24 @@ function CustomerStep({
               <span className="label-caps shrink-0 text-ink/40">{c.location ?? c.email ?? ""}</span>
             </button>
           ))}
+
+          {/* Picking a shop silently rewrites every price in the cart, so it
+              says so — and says so when there is no sheet to price from. */}
+          {retailerId &&
+            (priceList ? (
+              <p className="pt-1 text-sm text-ink/60">
+                {cartUnits === 1 ? "1 piece" : `${cartUnits} pieces`} priced from{" "}
+                <span className="text-bone">{priceList.name}</span>.
+              </p>
+            ) : (
+              <p className="pt-1 text-sm text-ink/60">
+                No agreed prices for this shop — the cart is at RRP.{" "}
+                <Link href="/catalogs" className="text-bone underline-offset-2 hover:underline">
+                  Set up a line sheet
+                </Link>
+                .
+              </p>
+            ))}
 
           {creating ? (
             <div className="space-y-2 rounded-lg border border-ink/60 p-4">
@@ -721,6 +771,7 @@ function PaymentStep({
 
 function ConfirmStep({
   cart,
+  priceList,
   kind,
   where,
   buyer,
@@ -741,6 +792,7 @@ function ConfirmStep({
   shopifyConfigured,
 }: {
   cart: CartLine[];
+  priceList: PriceList | null;
   kind: "sale" | "consignment";
   where: string;
   buyer: string;
@@ -763,6 +815,11 @@ function ConfirmStep({
   return (
     <div className="space-y-8">
       <Question title="The order">
+        {priceList && (
+          <p className="mb-3 text-sm text-ink/60">
+            Priced from <span className="text-bone">{priceList.name}</span>.
+          </p>
+        )}
         <div className="space-y-2">
           {cart.map((line) => (
             <div
@@ -783,7 +840,15 @@ function ConfirmStep({
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-bone">{line.productName}</p>
-                <p className="label-caps text-ink/50">{sizeLabel(line)}</p>
+                <p className="label-caps text-ink/50">
+                  {sizeLabel(line)}
+                  {/* The sheet is the agreed price; anything it doesn't cover
+                      fell back to RRP and is almost certainly too high. */}
+                  {priceList && !line.freebie && !line.priceEdited &&
+                    priceList.prices[line.variantId] == null && (
+                      <span className="ml-2 text-pink">at RRP — no agreed rate</span>
+                    )}
+                </p>
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="number"
@@ -792,7 +857,12 @@ function ConfirmStep({
                     inputMode="decimal"
                     value={line.freebie ? 0 : line.unitPrice}
                     disabled={line.freebie}
-                    onChange={(e) => onLine(line.variantId, { unitPrice: Number(e.target.value) })}
+                    onChange={(e) =>
+                      onLine(line.variantId, {
+                        unitPrice: Number(e.target.value),
+                        priceEdited: true,
+                      })
+                    }
                     className="w-20 rounded-md border border-line bg-surface px-2 py-1 font-mono text-sm tabular-nums text-bone outline-none focus:border-ink disabled:opacity-40"
                   />
                   <button

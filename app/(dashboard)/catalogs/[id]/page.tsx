@@ -6,6 +6,7 @@ import {
   updateCatalogItemPrice,
   removeCatalogItem,
   autoPriceCatalog,
+  setCatalogRetailer,
 } from "@/lib/actions/catalogs";
 import { Table, Th, Td } from "@/components/ui/table";
 import { Label, Input } from "@/components/ui/input";
@@ -67,6 +68,29 @@ export default async function CatalogDetailPage({ params }: { params: Promise<{ 
         </div>
         <Link href="/catalogs" className="label-caps text-ink/60 hover:text-ink">← Catalogs</Link>
       </div>
+
+      {/* Whose prices these are. Attaching a shop is what makes the sales
+          wizard price its consignations from this sheet instead of at RRP. */}
+      <form
+        action={setCatalogRetailer.bind(null, catalog.id)}
+        className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4"
+      >
+        <div className="min-w-56 flex-1 space-y-1">
+          <Label htmlFor="retailer_id">Agreed with</Label>
+          <Select id="retailer_id" name="retailer_id" defaultValue={catalog.retailer_id ?? ""}>
+            <option value="">Nobody yet — a pitch sheet</option>
+            {(retailers ?? []).map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </Select>
+        </div>
+        <Button type="submit" variant="secondary">Save</Button>
+        <p className="w-full text-sm text-ink/50">
+          {catalog.retailer_id
+            ? "New sales to this shop are priced from this sheet."
+            : "Attach a shop and the sales wizard will price their orders from these prices instead of RRP."}
+        </p>
+      </form>
 
       {/* Items */}
       <div className="space-y-3">

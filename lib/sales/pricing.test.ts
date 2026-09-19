@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { apportionDiscount, channelFor, type PricedLine } from "./pricing.ts";
+import {
+  apportionDiscount,
+  channelFor,
+  priceFor,
+  repriceCart,
+  type PriceList,
+  type PricedLine,
+} from "./pricing.ts";
 
 // Run with `npm test`. Node's own runner, no framework — these are pure
 // functions and the project keeps its dependency list short on purpose.
@@ -96,4 +103,68 @@ test("the Notion Where option routes a walk-up sale to a channel", () => {
   // Options with no obvious home fall through rather than guessing.
   assert.equal(at("Cyber Loja"), "other");
   assert.equal(at(null), "other");
+});
+
+// ---------------------------------------------------------------------------
+// Agreed prices
+// ---------------------------------------------------------------------------
+
+// Cybercafé's real sheet: €26 on a €50 tee, €36 on a €75 longsleeve. The
+// keychain is deliberately absent — nobody negotiated a rate for it.
+const cybercafe: PriceList = {
+  catalogId: "c1",
+  name: "Cybercafé — house rates",
+  prices: { tee: 26, longsleeve: 36 },
+};
+
+test("a variant on the sheet goes out at the agreed price", () => {
+  assert.deepEqual(priceFor("tee", 50, cybercafe), { unitPrice: 26, agreed: true });
+  assert.deepEqual(priceFor("longsleeve", 75, cybercafe), { unitPrice: 36, agreed: true });
+});
+
+test("a variant the sheet doesn't cover falls back to RRP, and says so", () => {
+  // Not 50% of RRP, not zero: a visible wrong price beats an invented one.
+  assert.deepEqual(priceFor("keychain", 10, cybercafe), { unitPrice: 10, agreed: false });
+});
+
+test("with no customer picked, everything is RRP", () => {
+  assert.deepEqual(priceFor("tee", 50, null), { unitPrice: 50, agreed: false });
+});
+
+const cartLine = (variantId: string, unitPrice: number, retailPrice: number, priceEdited = false) => ({
+  variantId,
+  unitPrice,
+  retailPrice,
+  priceEdited,
+});
+
+test("picking a shop reprices the cart that was built at RRP", () => {
+  const cart = [cartLine("tee", 50, 50), cartLine("longsleeve", 75, 75)];
+  assert.deepEqual(
+    repriceCart(cart, cybercafe).map((l) => l.unitPrice),
+    [26, 36],
+  );
+});
+
+test("a price the seller typed survives changing the customer", () => {
+  const cart = [cartLine("tee", 20, 50, true), cartLine("longsleeve", 75, 75)];
+  assert.deepEqual(
+    repriceCart(cart, cybercafe).map((l) => l.unitPrice),
+    [20, 36],
+  );
+});
+
+test("clearing the customer puts the untouched lines back to RRP", () => {
+  const cart = repriceCart([cartLine("tee", 50, 50), cartLine("keychain", 10, 10)], cybercafe);
+  assert.deepEqual(
+    repriceCart(cart, null).map((l) => l.unitPrice),
+    [50, 10],
+  );
+});
+
+test("repricing keeps the identity of lines it does not change", () => {
+  // The wizard renders from this array; replacing untouched lines would throw
+  // away their React state for nothing.
+  const cart = [cartLine("keychain", 10, 10)];
+  assert.equal(repriceCart(cart, cybercafe)[0], cart[0]);
 });

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import type { PriceList } from "@/lib/sales/pricing";
 
 // Shared reader for the sales tab. Every sub-tab wants the same shape — an
 // order with its lines, its money and its sync state — so it is assembled once
@@ -377,4 +378,53 @@ export async function loadCustomers(): Promise<
     email: r.contact_email,
     location: r.location,
   }));
+}
+
+/**
+ * Each shop's agreed prices, keyed by retailer id.
+ *
+ * Loaded whole and up front, like the rest of the till: the wizard is pure
+ * client state once it's on screen, because at a market the network is the
+ * slowest part of the machine and picking a customer must not wait on a fetch.
+ * It stays small — a few sheets of a few dozen variants.
+ *
+ * A shop can hold more than one sheet (SS26, then AW26). The newest wins, and
+ * the wizard shows its name, so the one in force is visible rather than
+ * guessed at.
+ */
+export async function loadPriceLists(): Promise<Record<string, PriceList>> {
+  const supabase = await createClient();
+
+  const { data: catalogs } = await supabase
+    .from("catalogs")
+    .select("id, name, retailer_id")
+    .not("retailer_id", "is", null)
+    .order("created_at", { ascending: false });
+  if (!catalogs?.length) return {};
+
+  // Newest first, so the first sheet seen for a retailer is the one that counts.
+  const sheetByRetailer = new Map<string, { id: string; name: string }>();
+  for (const c of catalogs) {
+    if (c.retailer_id && !sheetByRetailer.has(c.retailer_id)) {
+      sheetByRetailer.set(c.retailer_id, { id: c.id, name: c.name });
+    }
+  }
+
+  const { data: items } = await supabase
+    .from("catalog_items")
+    .select("catalog_id, variant_id, wholesale_price")
+    .in("catalog_id", [...sheetByRetailer.values()].map((s) => s.id));
+
+  const lists: Record<string, PriceList> = {};
+  for (const [retailerId, sheet] of sheetByRetailer) {
+    const prices: Record<string, number> = {};
+    for (const item of items ?? []) {
+      // A row with no price is a pitch line nobody agreed a rate for yet; it
+      // has to fall through to RRP rather than land in the cart as €0.
+      if (item.catalog_id !== sheet.id || item.wholesale_price == null) continue;
+      prices[item.variant_id] = Number(item.wholesale_price);
+    }
+    lists[retailerId] = { catalogId: sheet.id, name: sheet.name, prices };
+  }
+  return lists;
 }

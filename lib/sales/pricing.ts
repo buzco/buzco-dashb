@@ -73,3 +73,73 @@ export function channelFor(input: {
   }
   return "other";
 }
+
+// ---------------------------------------------------------------------------
+// Agreed prices
+// ---------------------------------------------------------------------------
+
+/**
+ * What one shop has agreed to pay, per variant — a line sheet pointed at a
+ * retailer (see migration 010).
+ *
+ * The rates are negotiated, not derived: Cybercafé's €26 / €36 / €22 work out
+ * at 52% / 48% / 55% of RRP. There is no percentage to apply, so a variant
+ * missing from the sheet has NO agreed price and must not be invented.
+ */
+export type PriceList = {
+  catalogId: string;
+  /** Shown on screen, so which sheet was applied is never a guess. */
+  name: string;
+  /** variantId -> agreed unit price. */
+  prices: Record<string, number>;
+};
+
+export type PricedFor = {
+  unitPrice: number;
+  /** False when this fell back to RRP because the sheet doesn't cover it. */
+  agreed: boolean;
+};
+
+/**
+ * The price a variant should go out at for this buyer.
+ *
+ * Falls back to retail rather than to zero or to a guessed percentage: selling
+ * at RRP is a wrong price someone can see and fix, while a silent €0 is a
+ * giveaway and a silently invented discount is a loss nobody notices.
+ */
+export function priceFor(
+  variantId: string,
+  retail: number,
+  list: PriceList | null,
+): PricedFor {
+  const agreed = list?.prices[variantId];
+  if (agreed == null || !Number.isFinite(agreed)) {
+    return { unitPrice: cents(retail), agreed: false };
+  }
+  return { unitPrice: cents(agreed), agreed: true };
+}
+
+export type RepricableLine = {
+  variantId: string;
+  unitPrice: number;
+  /** Retail, kept so switching back to "no customer" can restore it. */
+  retailPrice: number;
+  /** Set once the seller types a price by hand. */
+  priceEdited: boolean;
+};
+
+/**
+ * Re-price a cart after the buyer changes.
+ *
+ * The wizard asks for items BEFORE it asks who they're for, so by the time a
+ * shop is picked the cart is already full of RRP. Repricing then is the whole
+ * point — but a price the seller typed themselves is a decision, not a default,
+ * so an edited line is left exactly as it is.
+ */
+export function repriceCart<T extends RepricableLine>(lines: T[], list: PriceList | null): T[] {
+  return lines.map((line) => {
+    if (line.priceEdited) return line;
+    const { unitPrice } = priceFor(line.variantId, line.retailPrice, list);
+    return unitPrice === line.unitPrice ? line : { ...line, unitPrice };
+  });
+}

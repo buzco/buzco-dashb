@@ -29,6 +29,25 @@ export async function deleteCatalog(catalogId: string) {
   redirect("/catalogs");
 }
 
+// Point a line sheet at a shop. That link is what makes the sales wizard price
+// a consignation at what this boutique actually pays instead of at RRP — the
+// two differ by roughly half, and nobody should be retyping that at a till.
+export async function setCatalogRetailer(catalogId: string, formData: FormData) {
+  const retailer_id = ((formData.get("retailer_id") as string) || "").trim() || null;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("catalogs")
+    .update({ retailer_id })
+    .eq("id", catalogId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/catalogs/${catalogId}`);
+  revalidatePath("/catalogs");
+  // The wizard loads every sheet up front, so it has to be told too.
+  revalidatePath("/sales/new");
+}
+
 export async function addCatalogItem(catalogId: string, formData: FormData) {
   const variant_id = (formData.get("variant_id") as string) || "";
   const priceRaw = (formData.get("wholesale_price") as string) || "";
