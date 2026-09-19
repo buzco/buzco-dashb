@@ -58,6 +58,37 @@ const SALE_SELECT = `
   variants ( sku, size, color, products ( name ) )
 `;
 
+// The same query without anything migration 009 added. A market sale carries no
+// order and never needed those columns — so on a database where 009 hasn't been
+// applied yet, the till must keep mirroring rather than parking every sale in
+// notion_error until someone runs the migration and presses retry.
+const LEGACY_SALE_SELECT = `
+  id, quantity, gross_amount, discount_amount, customer_ref, payment_method, sold_at,
+  notion_page_id,
+  market_events ( name ),
+  variants ( sku, size, color, products ( name ) )
+`;
+
+/** Loads sale rows, falling back to the pre-009 shape when those columns are absent. */
+async function selectSales(
+  supabase: SupabaseLike,
+  saleIds: string[],
+): Promise<{ sales: SaleRow[]; error?: string }> {
+  const first = await supabase.from("sales").select(SALE_SELECT).in("id", saleIds);
+  if (!first.error) return { sales: (first.data ?? []) as unknown as SaleRow[] };
+
+  // 42703 = undefined_column, 42P01 = undefined_table (the sale_orders join);
+  // PostgREST reports PGRST200 when an embedded relation can't be resolved.
+  const code = first.error.code;
+  if (code !== "42703" && code !== "42P01" && code !== "PGRST200" && code !== "PGRST204") {
+    return { sales: [], error: first.error.message };
+  }
+
+  const legacy = await supabase.from("sales").select(LEGACY_SALE_SELECT).in("id", saleIds);
+  if (legacy.error) return { sales: [], error: legacy.error.message };
+  return { sales: (legacy.data ?? []) as unknown as SaleRow[] };
+}
+
 /**
  * Their tracker's vocabulary: a giveaway is "Oferta", an IOU is "Por pagar",
  * anything actually collected is "Pago".
@@ -137,10 +168,9 @@ export async function mirrorSalesToNotion(
   if (!saleIds.length) return result;
 
   const supabase = client ?? (await createClient());
-  const { data, error } = await supabase.from("sales").select(SALE_SELECT).in("id", saleIds);
-  if (error) return { synced: 0, failed: saleIds.length, errors: [error.message] };
+  const { sales, error } = await selectSales(supabase, saleIds);
+  if (error) return { synced: 0, failed: saleIds.length, errors: [error] };
 
-  const sales = (data ?? []) as unknown as SaleRow[];
   // One schema fetch and one option fetch for the whole batch.
   const [db, options] = await Promise.all([getDatabase(salesDbId()), getSalesOptions()]);
 
