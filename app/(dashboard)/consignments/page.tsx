@@ -38,7 +38,7 @@ export default async function ConsignmentsPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="label-caps text-ink/60">Consignments</h1>
+        <h1 className="label-caps text-ink/60">Retailer stock</h1>
         <Link href="/consignments/new">
           <Button>New consignment</Button>
         </Link>

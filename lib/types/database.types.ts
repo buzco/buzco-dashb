@@ -399,11 +399,13 @@ export interface Database {
           net_amount: number;
           shopify_order_id: string | null;
           shopify_line_item_id: string | null;
-          payment_method: string | null;
+          payment_method: string | null;
           market_event_id: string | null;
           notion_page_id: string | null;
           notion_synced_at: string | null;
           notion_error: string | null;
+          sale_order_id: string | null;
+          is_freebie: boolean;
           customer_ref: string | null;
           sold_at: string;
           notes: string | null;
@@ -419,11 +421,13 @@ export interface Database {
           fees_amount?: number;
           shopify_order_id?: string | null;
           shopify_line_item_id?: string | null;
-          payment_method?: string | null;
+          payment_method?: string | null;
           market_event_id?: string | null;
           notion_page_id?: string | null;
           notion_synced_at?: string | null;
           notion_error?: string | null;
+          sale_order_id?: string | null;
+          is_freebie?: boolean;
           customer_ref?: string | null;
           sold_at?: string;
           notes?: string | null;
@@ -439,11 +443,13 @@ export interface Database {
           fees_amount?: number;
           shopify_order_id?: string | null;
           shopify_line_item_id?: string | null;
-          payment_method?: string | null;
+          payment_method?: string | null;
           market_event_id?: string | null;
           notion_page_id?: string | null;
           notion_synced_at?: string | null;
           notion_error?: string | null;
+          sale_order_id?: string | null;
+          is_freebie?: boolean;
           customer_ref?: string | null;
           sold_at?: string;
           notes?: string | null;
@@ -461,6 +467,79 @@ export interface Database {
             columns: ["market_event_id"];
             isOneToOne: false;
             referencedRelation: "market_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_sale_order_id_fkey";
+            columns: ["sale_order_id"];
+            isOneToOne: false;
+            referencedRelation: "sale_orders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      // Migration 009 — the header a multi-item sale or a consignation hangs off.
+      sale_orders: {
+        Row: {
+          id: string;
+          kind: string;
+          reference: string;
+          channel: Database["public"]["Enums"]["sale_channel"];
+          retailer_id: string | null;
+          customer_name: string | null;
+          where_sold: string | null;
+          payment_status: string;
+          payment_method: string | null;
+          discount_kind: string | null;
+          discount_value: number;
+          notes: string | null;
+          shopify_order_id: string | null;
+          shopify_order_name: string | null;
+          settled_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          kind?: string;
+          reference: string;
+          channel?: Database["public"]["Enums"]["sale_channel"];
+          retailer_id?: string | null;
+          customer_name?: string | null;
+          where_sold?: string | null;
+          payment_status?: string;
+          payment_method?: string | null;
+          discount_kind?: string | null;
+          discount_value?: number;
+          notes?: string | null;
+          shopify_order_id?: string | null;
+          shopify_order_name?: string | null;
+          settled_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          kind?: string;
+          reference?: string;
+          channel?: Database["public"]["Enums"]["sale_channel"];
+          retailer_id?: string | null;
+          customer_name?: string | null;
+          where_sold?: string | null;
+          payment_status?: string;
+          payment_method?: string | null;
+          discount_kind?: string | null;
+          discount_value?: number;
+          notes?: string | null;
+          shopify_order_id?: string | null;
+          shopify_order_name?: string | null;
+          settled_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sale_orders_retailer_id_fkey";
+            columns: ["retailer_id"];
+            isOneToOne: false;
+            referencedRelation: "retailers";
             referencedColumns: ["id"];
           },
         ];
@@ -842,8 +921,54 @@ export interface Database {
           p_shopify_order_id?: string | null;
           p_shopify_line_item_id?: string | null;
           p_sold_at?: string;
+          // Migration 008. The app falls back to the 12-arg signature when the
+          // migration hasn't been applied, so this stays optional.
+          p_location_id?: string | null;
         };
         Returns: Database["public"]["Tables"]["sales"]["Row"];
+      };
+      // Migration 009 — one call writes an order, its lines and its movements.
+      log_sale_order: {
+        Args: {
+          p_kind: string;
+          p_channel: Database["public"]["Enums"]["sale_channel"];
+          p_retailer_id: string | null;
+          p_customer_name: string | null;
+          p_where: string | null;
+          p_payment_status: string;
+          p_payment_method: string | null;
+          p_discount_kind: string | null;
+          p_discount_value: number;
+          p_notes: string | null;
+          p_location_id: string;
+          /** [{ variant_id, quantity, unit_price, discount_amount, freebie }] */
+          p_lines: Array<{
+            variant_id: string;
+            quantity: number;
+            unit_price: number;
+            discount_amount: number;
+            freebie: boolean;
+          }>;
+          p_shopify_order_id?: string | null;
+          p_shopify_order_name?: string | null;
+          p_sold_at?: string;
+        };
+        Returns: Database["public"]["Tables"]["sale_orders"]["Row"];
+      };
+      settle_sale_order: {
+        Args: {
+          p_order_id: string;
+          p_payment_method: string | null;
+          p_settled_at?: string;
+        };
+        Returns: Database["public"]["Tables"]["sale_orders"]["Row"];
+      };
+      return_sale_order_line: {
+        Args: {
+          p_sale_id: string;
+          p_to_location_id: string;
+        };
+        Returns: undefined;
       };
       set_market_price: {
         Args: {

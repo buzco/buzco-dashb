@@ -29,7 +29,10 @@ export const DEPARTMENTS: Department[] = [
     items: [
       { href: "/catalogs", label: "Line sheets" },
       { href: "/retailers", label: "Retailers" },
-      { href: "/consignments", label: "Consignments" },
+      // "Retailer stock", not "Consignments": this tracks stock physically
+      // living at a shop. Logging a consignation as a SALE happens under
+      // Sales → Consignations, and two tabs with the same name was confusing.
+      { href: "/consignments", label: "Retailer stock" },
     ],
   },
   {

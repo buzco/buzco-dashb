@@ -28,6 +28,11 @@ export type NotionSaleItem = {
   status: string;
   /** Payment method label, e.g. "Cash", "Card (POS)", "Mbway André". */
   paymentMethod: string | null;
+  /**
+   * The tracker's "Where" option for this sale. Market sales don't set it and
+   * get "Feira"; the sales logger passes whichever option the seller picked.
+   */
+  where?: string | null;
   /** Free-text row label — this DB's title property is "Notes". */
   title: string;
   soldAt: string;
@@ -84,7 +89,7 @@ export async function createSalePagesWithSchema(
       { aliases: [...ALIASES.size], value: item.size },
       { aliases: [...ALIASES.colour], value: item.colour },
       { aliases: [...ALIASES.sku], value: item.sku },
-      { aliases: [...ALIASES.where], value: MARKET_WHERE },
+      { aliases: [...ALIASES.where], value: item.where || MARKET_WHERE },
       { aliases: [...ALIASES.status], value: item.status },
       { aliases: [...ALIASES.payment], value: item.paymentMethod },
       { aliases: [...ALIASES.value], value: item.unitPrice },

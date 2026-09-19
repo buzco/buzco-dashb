@@ -10,6 +10,10 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    // Node's `--experimental-strip-types` (how `npm test` runs) resolves the
+    // specifier literally, so a test must import "./pricing.ts" with the
+    // extension. Safe here because the project already sets noEmit.
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,

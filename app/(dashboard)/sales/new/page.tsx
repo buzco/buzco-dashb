@@ -1,0 +1,32 @@
+import { loadSaleCatalog } from "@/lib/sales/catalog";
+import { loadCustomers } from "@/lib/sales/data";
+import { getSalesOptions } from "@/lib/notion/options";
+import { isNotionConfigured } from "@/lib/notion/client";
+import { isShopifyConfigured } from "@/lib/shopify/client";
+import { SaleWizard } from "./sale-wizard";
+
+// Everything the till needs is fetched here, in parallel, so the wizard is pure
+// client state once it is on screen — at a market the network is the slowest
+// part of the machine and no tap should have to wait on it.
+
+export default async function NewSalePage() {
+  const notionConfigured = isNotionConfigured();
+
+  const [products, customers, options] = await Promise.all([
+    loadSaleCatalog(),
+    loadCustomers(),
+    getSalesOptions(),
+  ]);
+
+  return (
+    <SaleWizard
+      products={products}
+      customers={customers}
+      whereOptions={options.where}
+      paymentOptions={options.payment}
+      optionsAreLive={options.live && notionConfigured}
+      notionConfigured={notionConfigured}
+      shopifyConfigured={isShopifyConfigured()}
+    />
+  );
+}

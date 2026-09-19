@@ -1,0 +1,348 @@
+import "server-only";
+
+import { createClient } from "@/lib/supabase/server";
+
+// Shared reader for the sales tab. Every sub-tab wants the same shape — an
+// order with its lines, its money and its sync state — so it is assembled once
+// here rather than re-derived per page.
+//
+// Supabase's nested selects are avoided for the line side on purpose: `sales`
+// rows predate `sale_orders` (markets, Shopify imports, raffles) and must keep
+// loading even when they belong to no order at all.
+
+export type SaleOrderLineView = {
+  saleId: string;
+  variantId: string | null;
+  productName: string;
+  sku: string;
+  size: string | null;
+  color: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  /** Before the line's share of the order discount. */
+  grossAmount: number;
+  discountAmount: number;
+  netAmount: number;
+  isFreebie: boolean;
+  notionPageId: string | null;
+  notionError: string | null;
+};
+
+export type SaleOrderView = {
+  id: string;
+  reference: string;
+  kind: "sale" | "consignment";
+  channel: string;
+  customerName: string | null;
+  retailerId: string | null;
+  retailerName: string | null;
+  retailerEmail: string | null;
+  whereSold: string | null;
+  paymentStatus: "paid" | "pending";
+  paymentMethod: string | null;
+  discountKind: string | null;
+  discountValue: number;
+  notes: string | null;
+  shopifyOrderName: string | null;
+  settledAt: string | null;
+  createdAt: string;
+  lines: SaleOrderLineView[];
+  units: number;
+  gross: number;
+  discount: number;
+  net: number;
+  unsyncedNotion: number;
+};
+
+type OrderRow = {
+  id: string;
+  reference: string;
+  kind: string;
+  channel: string;
+  retailer_id: string | null;
+  customer_name: string | null;
+  where_sold: string | null;
+  payment_status: string;
+  payment_method: string | null;
+  discount_kind: string | null;
+  discount_value: number;
+  notes: string | null;
+  shopify_order_name: string | null;
+  settled_at: string | null;
+  created_at: string;
+};
+
+/** Reports a missing migration 009 as "no orders" rather than a crashed page. */
+function isMissingOrdersTable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  // 42P01 = undefined_table; PostgREST answers PGRST205 for an unknown
+  // relation. The message check is a belt-and-braces for a PostgREST version
+  // that words it differently — it deliberately does NOT match any error that
+  // merely mentions the table, so a real failure still surfaces.
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    /could not find the table.*sale_orders/i.test(error.message ?? "")
+  );
+}
+
+type LoadOptions = {
+  kind?: "sale" | "consignment";
+  limit?: number;
+  /** Only orders still awaiting payment. */
+  pendingOnly?: boolean;
+  /** Just this one order, with its lines assembled the same way. */
+  id?: string;
+};
+
+export async function loadSaleOrders(options: LoadOptions = {}): Promise<SaleOrderView[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("sale_orders")
+    .select(
+      "id, reference, kind, channel, retailer_id, customer_name, where_sold, payment_status, payment_method, discount_kind, discount_value, notes, shopify_order_name, settled_at, created_at",
+    )
+    .order("created_at", { ascending: false });
+
+  if (options.id) query = query.eq("id", options.id);
+  if (options.kind) query = query.eq("kind", options.kind);
+  if (options.pendingOnly) query = query.eq("payment_status", "pending");
+  if (options.limit) query = query.limit(options.limit);
+
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingOrdersTable(error)) return [];
+    throw new Error(error.message);
+  }
+
+  const orders = (data ?? []) as OrderRow[];
+  if (!orders.length) return [];
+
+  const [{ data: saleRows }, { data: retailers }] = await Promise.all([
+    supabase
+      .from("sales")
+      .select(
+        "id, sale_order_id, variant_id, quantity, gross_amount, discount_amount, net_amount, is_freebie, notion_page_id, notion_error",
+      )
+      .in("sale_order_id", orders.map((o) => o.id)),
+    (async () => {
+      const ids = [...new Set(orders.map((o) => o.retailer_id).filter(Boolean))] as string[];
+      if (!ids.length) return { data: [] };
+      return supabase.from("retailers").select("id, name, contact_email").in("id", ids);
+    })(),
+  ]);
+
+  const variantIds = [...new Set((saleRows ?? []).map((s) => s.variant_id).filter(Boolean))] as string[];
+  const { data: variants } = variantIds.length
+    ? await supabase
+        .from("variants")
+        .select("id, product_id, sku, size, color")
+        .in("id", variantIds)
+    : { data: [] };
+
+  const productIds = [...new Set((variants ?? []).map((v) => v.product_id))];
+  const { data: products } = productIds.length
+    ? await supabase.from("products").select("id, name, image_url").in("id", productIds)
+    : { data: [] };
+
+  const productById = new Map((products ?? []).map((p) => [p.id, p]));
+  const variantById = new Map((variants ?? []).map((v) => [v.id, v]));
+  const retailerById = new Map((retailers ?? []).map((r) => [r.id, r]));
+
+  const linesByOrder = new Map<string, SaleOrderLineView[]>();
+  for (const s of saleRows ?? []) {
+    if (!s.sale_order_id) continue;
+    const variant = s.variant_id ? variantById.get(s.variant_id) : undefined;
+    const product = variant ? productById.get(variant.product_id) : undefined;
+    const list = linesByOrder.get(s.sale_order_id) ?? [];
+    list.push({
+      saleId: s.id,
+      variantId: s.variant_id,
+      productName: product?.name ?? "Unknown product",
+      sku: variant?.sku ?? "—",
+      size: variant?.size ?? null,
+      color: variant?.color ?? null,
+      imageUrl: product?.image_url ?? null,
+      quantity: s.quantity,
+      grossAmount: Number(s.gross_amount),
+      discountAmount: Number(s.discount_amount),
+      netAmount: Number(s.net_amount),
+      isFreebie: Boolean(s.is_freebie),
+      notionPageId: s.notion_page_id,
+      notionError: s.notion_error,
+    });
+    linesByOrder.set(s.sale_order_id, list);
+  }
+
+  return orders.map((o) => {
+    const lines = (linesByOrder.get(o.id) ?? []).sort((a, b) =>
+      a.productName.localeCompare(b.productName),
+    );
+    const retailer = o.retailer_id ? retailerById.get(o.retailer_id) : undefined;
+    return {
+      id: o.id,
+      reference: o.reference,
+      kind: o.kind === "consignment" ? "consignment" : "sale",
+      channel: o.channel,
+      customerName: o.customer_name,
+      retailerId: o.retailer_id,
+      retailerName: retailer?.name ?? null,
+      retailerEmail: retailer?.contact_email ?? null,
+      whereSold: o.where_sold,
+      paymentStatus: o.payment_status === "pending" ? "pending" : "paid",
+      paymentMethod: o.payment_method,
+      discountKind: o.discount_kind,
+      discountValue: Number(o.discount_value),
+      notes: o.notes,
+      shopifyOrderName: o.shopify_order_name,
+      settledAt: o.settled_at,
+      createdAt: o.created_at,
+      lines,
+      units: lines.reduce((n, l) => n + l.quantity, 0),
+      gross: lines.reduce((n, l) => n + l.grossAmount, 0),
+      discount: lines.reduce((n, l) => n + l.discountAmount, 0),
+      net: lines.reduce((n, l) => n + l.netAmount, 0),
+      unsyncedNotion: lines.filter((l) => !l.notionPageId).length,
+    };
+  });
+}
+
+export async function loadSaleOrder(id: string): Promise<SaleOrderView | null> {
+  const [order] = await loadSaleOrders({ id });
+  return order ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard headline numbers
+// ---------------------------------------------------------------------------
+
+export type SalesTotals = {
+  todayNet: number;
+  monthNet: number;
+  monthUnits: number;
+  /** Money sitting with shops: consignations not yet settled. */
+  outstanding: number;
+  outstandingOrders: number;
+  unsyncedNotion: number;
+};
+
+export async function loadSalesTotals(): Promise<SalesTotals> {
+  const supabase = await createClient();
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const [{ data: monthSales }, { data: unsynced }, pendingOrders] = await Promise.all([
+    supabase
+      .from("sales")
+      .select("quantity, net_amount, sold_at")
+      .gte("sold_at", startOfMonth),
+    supabase.from("sales").select("id").is("notion_page_id", null),
+    loadSaleOrders({ pendingOnly: true }),
+  ]);
+
+  const rows = monthSales ?? [];
+  return {
+    todayNet: rows
+      .filter((s) => s.sold_at >= startOfDay)
+      .reduce((n, s) => n + Number(s.net_amount), 0),
+    monthNet: rows.reduce((n, s) => n + Number(s.net_amount), 0),
+    monthUnits: rows.reduce((n, s) => n + s.quantity, 0),
+    outstanding: pendingOrders.reduce((n, o) => n + o.net, 0),
+    outstandingOrders: pendingOrders.length,
+    unsyncedNotion: (unsynced ?? []).length,
+  };
+}
+
+export type LooseSaleView = {
+  id: string;
+  channel: string;
+  quantity: number;
+  netAmount: number;
+  customerRef: string | null;
+  soldAt: string;
+  notes: string | null;
+  label: string;
+};
+
+/**
+ * Sales that belong to no order — market tills, Shopify imports, raffle rows,
+ * and anything logged before migration 009.
+ *
+ * The `sale_order_id` filter is retried without it when the column doesn't
+ * exist yet, mirroring how lib/market/record-sale.ts handles the pre-008
+ * signature: the page should still render on a database that hasn't been
+ * migrated, showing every sale rather than none.
+ */
+export async function loadLooseSales(limit = 25): Promise<LooseSaleView[]> {
+  const supabase = await createClient();
+  const columns =
+    "id, channel, variant_id, quantity, net_amount, customer_ref, sold_at, notes";
+
+  let { data, error } = await supabase
+    .from("sales")
+    .select(columns)
+    .is("sale_order_id", null)
+    .order("sold_at", { ascending: false })
+    .limit(limit);
+
+  // 42703 = undefined_column; PostgREST reports PGRST204 for the same thing.
+  if (error && (error.code === "42703" || error.code === "PGRST204")) {
+    ({ data, error } = await supabase
+      .from("sales")
+      .select(columns)
+      .order("sold_at", { ascending: false })
+      .limit(limit));
+  }
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  const variantIds = [...new Set(rows.map((s) => s.variant_id).filter(Boolean))] as string[];
+  const { data: variants } = variantIds.length
+    ? await supabase.from("variants").select("id, sku, size, color, product_id").in("id", variantIds)
+    : { data: [] };
+  const productIds = [...new Set((variants ?? []).map((v) => v.product_id))];
+  const { data: products } = productIds.length
+    ? await supabase.from("products").select("id, name").in("id", productIds)
+    : { data: [] };
+
+  const productName = new Map((products ?? []).map((p) => [p.id, p.name]));
+  const variantById = new Map((variants ?? []).map((v) => [v.id, v]));
+
+  return rows.map((s) => {
+    const v = s.variant_id ? variantById.get(s.variant_id) : undefined;
+    const attrs = v ? [v.size, v.color].filter(Boolean).join(" / ") : "";
+    return {
+      id: s.id,
+      channel: s.channel,
+      quantity: s.quantity,
+      netAmount: Number(s.net_amount),
+      customerRef: s.customer_ref,
+      soldAt: s.sold_at,
+      notes: s.notes,
+      // Raffle rows have no variant — show what was actually sold.
+      label: v
+        ? `${productName.get(v.product_id) ?? "?"} — ${v.sku}${attrs ? ` (${attrs})` : ""}`
+        : (s.notes ?? s.customer_ref ?? "—"),
+    };
+  });
+}
+
+/** The wholesale customer book — retailers, newest-used first. */
+export async function loadCustomers(): Promise<
+  Array<{ id: string; name: string; email: string | null; location: string | null }>
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("retailers")
+    .select("id, name, contact_email, location")
+    .order("name");
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.contact_email,
+    location: r.location,
+  }));
+}
