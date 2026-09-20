@@ -211,6 +211,8 @@ export const COLUMNS: Column[] = [
     ),
   },
   {
+    // The order number as Shopify prints it (#1055), which is what you'd
+    // search for or quote — the GID's digits only go in the admin link.
     key: "shopify",
     label: "Shopify order",
     type: "text",
@@ -223,7 +225,7 @@ export const COLUMNS: Column[] = [
             href={r.shopifyAdminUrl}
             target="_blank"
             rel="noreferrer"
-            className="font-mono text-xs text-bone underline-offset-2 hover:underline"
+            className="whitespace-nowrap font-mono text-xs text-bone underline-offset-2 hover:underline"
           >
             {r.shopifyOrderNumber}
           </a>

@@ -386,9 +386,10 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
     : { data: [] };
   const eventById = new Map((events ?? []).map((e) => [e.id, e]));
 
-  // Shopify hands back a GID; the digits on the end are what the admin URL
-  // wants. The human order NAME (#1043) is never stored on a sale row, so the
-  // number below is the order id, not the number printed on the invoice.
+  // The order NUMBER (#1055) is what the importer already parks in
+  // customer_ref — Shopify's customer fields are plan-gated, so that column
+  // carries the order name on a Shopify row and a real buyer on every other.
+  // The GID's trailing digits are a separate thing: the admin URL wants those.
   const shopDomain = process.env.SHOPIFY_STORE_DOMAIN ?? null;
 
   const productById = new Map((products ?? []).map((p) => [p.id, p]));
@@ -401,7 +402,9 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
     const quantity = Number(s.quantity ?? 0);
     const netAmount = Number(s.net_amount ?? 0);
     const event = s.market_event_id ? eventById.get(s.market_event_id as string) : undefined;
-    const orderNumber = ((s.shopify_order_id as string) ?? "").split("/").pop() || null;
+    const customerRef = (s.customer_ref as string) || null;
+    const fromShopify = Boolean(s.shopify_order_id);
+    const orderId = ((s.shopify_order_id as string) ?? "").split("/").pop() || null;
 
     return {
       id: s.id as string,
@@ -413,7 +416,10 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
       shippingAmount: Number(s.shipping_amount ?? 0),
       netAmount,
       unitPrice: quantity > 0 ? Math.round((netAmount / quantity) * 100) / 100 : netAmount,
-      customerRef: (s.customer_ref as string) ?? null,
+      // On a Shopify row this column holds the order number, not a person, so
+      // it is reported as the order and left out of Customer rather than
+      // showing "#1055" under a heading that promises a buyer.
+      customerRef: fromShopify ? null : customerRef,
       paymentMethod: (s.payment_method as string) ?? null,
       soldAt: s.sold_at as string,
       notes: (s.notes as string) ?? null,
@@ -435,13 +441,11 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
         event?.venue ??
         event?.name ??
         (s.channel === "shopify" ? "Online" : null) ??
-        ((s.customer_ref as string) || null),
+        (fromShopify ? null : customerRef),
       shopifyOrderId: (s.shopify_order_id as string) ?? null,
-      shopifyOrderNumber: orderNumber,
+      shopifyOrderNumber: fromShopify ? (customerRef ?? orderId) : null,
       shopifyAdminUrl:
-        shopDomain && orderNumber
-          ? `https://${shopDomain}/admin/orders/${orderNumber}`
-          : null,
+        shopDomain && orderId ? `https://${shopDomain}/admin/orders/${orderId}` : null,
       notionSynced: Boolean(s.notion_page_id),
       notionError: (s.notion_error as string) ?? null,
     };
