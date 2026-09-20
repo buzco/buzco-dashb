@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { isNotionConfigured } from "@/lib/notion/client";
 import { loadLooseSales, loadSaleOrders, loadSalesTotals } from "@/lib/sales/data";
-import { Table, Th, Td } from "@/components/ui/table";
 import { OrderBlock } from "./order-block";
+import { LooseSales } from "./loose-sales";
 
 // The overview answers three questions in order: what came in today, what is
 // still owed, and what was the last thing logged. Orders come first because
@@ -14,7 +14,7 @@ export default async function SalesPage() {
   const [totals, orders, looseSales] = await Promise.all([
     loadSalesTotals(),
     loadSaleOrders({ limit: 25 }),
-    loadLooseSales(25),
+    loadLooseSales(),
   ]);
 
   return (
@@ -66,34 +66,10 @@ export default async function SalesPage() {
           <p className="text-sm text-ink/50">
             Market tills, Shopify imports and raffle rows — recorded outside an order.
           </p>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Date</Th>
-                <Th>Channel</Th>
-                <Th>Item</Th>
-                <Th className="text-right">Qty</Th>
-                <Th className="text-right">Net</Th>
-                <Th>Customer</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {looseSales.map((s) => (
-                <tr key={s.id}>
-                  <Td className="text-ink/70">{new Date(s.soldAt).toLocaleDateString()}</Td>
-                  <Td className="label-caps">{s.channel.replace(/_/g, " ")}</Td>
-                  <Td className="text-bone">{s.label}</Td>
-                  <Td className="text-right font-mono tabular-nums">{s.quantity}</Td>
-                  <Td className="text-right font-mono tabular-nums text-bone">
-                    €{s.netAmount.toFixed(2)}
-                  </Td>
-                  <Td className="text-ink/70">{s.customerRef ?? "—"}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+          <LooseSales rows={looseSales} />
         </section>
       )}
+
     </div>
   );
 }

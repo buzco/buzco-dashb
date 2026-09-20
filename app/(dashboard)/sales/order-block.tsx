@@ -27,7 +27,7 @@ export function OrderBlock({
           the counts underneath. Squeezed onto a single line the customer name
           was the thing that collapsed, which is the one field you scan for. */}
       <summary className="cursor-pointer list-none p-3">
-        <div className="flex items-center gap-x-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="label-caps shrink-0 text-ink/30 transition-transform group-open:rotate-90">
             ›
           </span>
@@ -36,7 +36,10 @@ export function OrderBlock({
             {order.reference}
           </span>
 
-          <span className="min-w-0 flex-1 truncate text-bone">
+          {/* Below sm the name drops to its own line rather than truncating
+              to "Cybe…": the reference, the badge and the amount are each a
+              fixed width, and the buyer is the field you actually scan for. */}
+          <span className="order-last min-w-0 basis-full truncate text-bone sm:order-none sm:basis-0 sm:flex-1">
             {buyer ?? order.whereSold ?? "—"}
           </span>
 
@@ -54,8 +57,13 @@ export function OrderBlock({
               whole batch sits behind it, because most of it can come back. */}
           <span className="shrink-0 font-mono tabular-nums text-bone">
             €{(isConsignment && pending ? order.owed : order.net).toFixed(2)}
+            {/* Hidden on a phone: the two figures plus the reference and the
+                badge overflow 375px, and what's OWED is the one that has to
+                survive. The batch value is a click away in the detail. */}
             {isConsignment && pending && order.owed !== order.net && (
-              <span className="ml-1 text-ink/40">/ €{order.net.toFixed(2)}</span>
+              <span className="ml-1 hidden text-ink/40 sm:inline">
+                / €{order.net.toFixed(2)}
+              </span>
             )}
           </span>
         </div>

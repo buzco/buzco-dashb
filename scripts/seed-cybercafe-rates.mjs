@@ -20,7 +20,13 @@ const SHEET = "Cybercafé — house rates";
 
 // Product name -> agreed price per piece, every size the same.
 const RATES = new Map([
+  // The €40-RRP tees: one band, confirmed 2026-09-20.
   ["Spirit Animal Tee", 22],
+  ["Normalize Chilling Tee", 22],
+  ["Minerals Tee", 22],
+  ["Respectful Tee", 22],
+  ["Wise Hand Tee", 22],
+  ["Heaven's Gate Tee", 22],
   ["Superior Enti-tee", 26],
   ["Curiosi-tee", 26],
   ["Cosmic Divini-tee", 26],

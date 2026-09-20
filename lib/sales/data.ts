@@ -293,11 +293,28 @@ export type LooseSaleView = {
   id: string;
   channel: string;
   quantity: number;
+  grossAmount: number;
+  discountAmount: number;
   netAmount: number;
+  /** Net per garment — what the row actually went for, whatever the quantity. */
+  unitPrice: number;
   customerRef: string | null;
+  paymentMethod: string | null;
   soldAt: string;
   notes: string | null;
+  /** One-line description, still used where there's no room for the parts. */
   label: string;
+  productName: string | null;
+  sku: string | null;
+  size: string | null;
+  color: string | null;
+  imageUrl: string | null;
+  isFreebie: boolean;
+  /** Which market, for a till row — "Feira da Ladra" beats "market". */
+  marketEvent: string | null;
+  shopifyOrderId: string | null;
+  notionSynced: boolean;
+  notionError: string | null;
 };
 
 /**
@@ -309,56 +326,91 @@ export type LooseSaleView = {
  * signature: the page should still render on a database that hasn't been
  * migrated, showing every sale rather than none.
  */
-export async function loadLooseSales(limit = 25): Promise<LooseSaleView[]> {
+export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
   const supabase = await createClient();
-  const columns =
-    "id, channel, variant_id, quantity, net_amount, customer_ref, sold_at, notes";
 
-  let { data, error } = await supabase
-    .from("sales")
-    .select(columns)
-    .is("sale_order_id", null)
-    .order("sold_at", { ascending: false })
-    .limit(limit);
+  // The legacy set is what a pre-007 database can answer; the rest came with
+  // markets (007) and orders (009). Kept split so one missing column degrades
+  // the table to fewer columns rather than to an error page.
+  const LEGACY = "id, channel, variant_id, quantity, net_amount, customer_ref, sold_at, notes";
+  const FULL =
+    `${LEGACY}, gross_amount, discount_amount, payment_method, is_freebie, ` +
+    "market_event_id, shopify_order_id, notion_page_id, notion_error";
+
+  type Row = Record<string, unknown>;
+  async function read(columns: string, withOrderFilter: boolean) {
+    const q = supabase.from("sales").select(columns);
+    return (withOrderFilter ? q.is("sale_order_id", null) : q)
+      .order("sold_at", { ascending: false })
+      .limit(limit);
+  }
 
   // 42703 = undefined_column; PostgREST reports PGRST204 for the same thing.
-  if (error && (error.code === "42703" || error.code === "PGRST204")) {
-    ({ data, error } = await supabase
-      .from("sales")
-      .select(columns)
-      .order("sold_at", { ascending: false })
-      .limit(limit));
-  }
+  const undefinedColumn = (e: { code?: string } | null) =>
+    e?.code === "42703" || e?.code === "PGRST204";
+
+  let { data, error } = await read(FULL, true);
+  if (undefinedColumn(error)) ({ data, error } = await read(FULL, false));
+  if (undefinedColumn(error)) ({ data, error } = await read(LEGACY, true));
+  if (undefinedColumn(error)) ({ data, error } = await read(LEGACY, false));
   if (error) throw new Error(error.message);
 
-  const rows = data ?? [];
+  // The column list is built at runtime, so supabase-js can't type the rows;
+  // they are read back field by field below.
+  const rows = (data ?? []) as unknown as Row[];
   const variantIds = [...new Set(rows.map((s) => s.variant_id).filter(Boolean))] as string[];
   const { data: variants } = variantIds.length
     ? await supabase.from("variants").select("id, sku, size, color, product_id").in("id", variantIds)
     : { data: [] };
   const productIds = [...new Set((variants ?? []).map((v) => v.product_id))];
   const { data: products } = productIds.length
-    ? await supabase.from("products").select("id, name").in("id", productIds)
+    ? await supabase.from("products").select("id, name, image_url").in("id", productIds)
     : { data: [] };
 
-  const productName = new Map((products ?? []).map((p) => [p.id, p.name]));
+  // A till row says "market"; the event says WHICH market, which is the thing
+  // you are actually scanning for.
+  const eventIds = [...new Set(rows.map((s) => s.market_event_id).filter(Boolean))] as string[];
+  const { data: events } = eventIds.length
+    ? await supabase.from("market_events").select("id, name").in("id", eventIds)
+    : { data: [] };
+  const eventName = new Map((events ?? []).map((e) => [e.id, e.name]));
+
+  const productById = new Map((products ?? []).map((p) => [p.id, p]));
   const variantById = new Map((variants ?? []).map((v) => [v.id, v]));
 
   return rows.map((s) => {
-    const v = s.variant_id ? variantById.get(s.variant_id) : undefined;
+    const v = s.variant_id ? variantById.get(s.variant_id as string) : undefined;
+    const product = v ? productById.get(v.product_id) : undefined;
     const attrs = v ? [v.size, v.color].filter(Boolean).join(" / ") : "";
+    const quantity = Number(s.quantity ?? 0);
+    const netAmount = Number(s.net_amount ?? 0);
+
     return {
-      id: s.id,
-      channel: s.channel,
-      quantity: s.quantity,
-      netAmount: Number(s.net_amount),
-      customerRef: s.customer_ref,
-      soldAt: s.sold_at,
-      notes: s.notes,
+      id: s.id as string,
+      channel: s.channel as string,
+      quantity,
+      grossAmount: Number(s.gross_amount ?? netAmount),
+      discountAmount: Number(s.discount_amount ?? 0),
+      netAmount,
+      unitPrice: quantity > 0 ? Math.round((netAmount / quantity) * 100) / 100 : netAmount,
+      customerRef: (s.customer_ref as string) ?? null,
+      paymentMethod: (s.payment_method as string) ?? null,
+      soldAt: s.sold_at as string,
+      notes: (s.notes as string) ?? null,
       // Raffle rows have no variant — show what was actually sold.
       label: v
-        ? `${productName.get(v.product_id) ?? "?"} — ${v.sku}${attrs ? ` (${attrs})` : ""}`
-        : (s.notes ?? s.customer_ref ?? "—"),
+        ? `${product?.name ?? "?"} — ${v.sku}${attrs ? ` (${attrs})` : ""}`
+        : ((s.notes as string) ?? (s.customer_ref as string) ?? "—"),
+      productName: product?.name ?? null,
+      sku: v?.sku ?? null,
+      size: v?.size ?? null,
+      color: v?.color ?? null,
+      imageUrl: product?.image_url ?? null,
+      isFreebie: Boolean(s.is_freebie),
+      marketEvent: s.market_event_id ? (eventName.get(s.market_event_id as string) ?? null) : null,
+      shopifyOrderId: (s.shopify_order_id as string) ?? null,
+      notionSynced: Boolean(s.notion_page_id),
+      notionError: (s.notion_error as string) ?? null,
     };
   });
 }
