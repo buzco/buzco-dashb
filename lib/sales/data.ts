@@ -295,6 +295,9 @@ export type LooseSaleView = {
   quantity: number;
   grossAmount: number;
   discountAmount: number;
+  /** Payment-processing fees. Nothing writes this yet — see loadLooseSales. */
+  feesAmount: number;
+  shippingAmount: number;
   netAmount: number;
   /** Net per garment — what the row actually went for, whatever the quantity. */
   unitPrice: number;
@@ -310,9 +313,16 @@ export type LooseSaleView = {
   color: string | null;
   imageUrl: string | null;
   isFreebie: boolean;
+  /** True for a row that is part of an unpaid consigned batch. */
+  isConsignment: boolean;
   /** Which market, for a till row — "Feira da Ladra" beats "market". */
   marketEvent: string | null;
+  /** Where it physically happened: the venue, "Online", or the buyer. */
+  location: string | null;
   shopifyOrderId: string | null;
+  /** The digits off the end of the Shopify GID — see loadLooseSales. */
+  shopifyOrderNumber: string | null;
+  shopifyAdminUrl: string | null;
   notionSynced: boolean;
   notionError: string | null;
 };
@@ -334,8 +344,9 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
   // the table to fewer columns rather than to an error page.
   const LEGACY = "id, channel, variant_id, quantity, net_amount, customer_ref, sold_at, notes";
   const FULL =
-    `${LEGACY}, gross_amount, discount_amount, payment_method, is_freebie, ` +
-    "market_event_id, shopify_order_id, notion_page_id, notion_error";
+    `${LEGACY}, gross_amount, discount_amount, fees_amount, shipping_amount, ` +
+    "payment_method, is_freebie, market_event_id, shopify_order_id, " +
+    "notion_page_id, notion_error";
 
   type Row = Record<string, unknown>;
   async function read(columns: string, withOrderFilter: boolean) {
@@ -371,9 +382,14 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
   // you are actually scanning for.
   const eventIds = [...new Set(rows.map((s) => s.market_event_id).filter(Boolean))] as string[];
   const { data: events } = eventIds.length
-    ? await supabase.from("market_events").select("id, name").in("id", eventIds)
+    ? await supabase.from("market_events").select("id, name, venue").in("id", eventIds)
     : { data: [] };
-  const eventName = new Map((events ?? []).map((e) => [e.id, e.name]));
+  const eventById = new Map((events ?? []).map((e) => [e.id, e]));
+
+  // Shopify hands back a GID; the digits on the end are what the admin URL
+  // wants. The human order NAME (#1043) is never stored on a sale row, so the
+  // number below is the order id, not the number printed on the invoice.
+  const shopDomain = process.env.SHOPIFY_STORE_DOMAIN ?? null;
 
   const productById = new Map((products ?? []).map((p) => [p.id, p]));
   const variantById = new Map((variants ?? []).map((v) => [v.id, v]));
@@ -384,6 +400,8 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
     const attrs = v ? [v.size, v.color].filter(Boolean).join(" / ") : "";
     const quantity = Number(s.quantity ?? 0);
     const netAmount = Number(s.net_amount ?? 0);
+    const event = s.market_event_id ? eventById.get(s.market_event_id as string) : undefined;
+    const orderNumber = ((s.shopify_order_id as string) ?? "").split("/").pop() || null;
 
     return {
       id: s.id as string,
@@ -391,6 +409,8 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
       quantity,
       grossAmount: Number(s.gross_amount ?? netAmount),
       discountAmount: Number(s.discount_amount ?? 0),
+      feesAmount: Number(s.fees_amount ?? 0),
+      shippingAmount: Number(s.shipping_amount ?? 0),
       netAmount,
       unitPrice: quantity > 0 ? Math.round((netAmount / quantity) * 100) / 100 : netAmount,
       customerRef: (s.customer_ref as string) ?? null,
@@ -407,8 +427,21 @@ export async function loadLooseSales(limit = 500): Promise<LooseSaleView[]> {
       color: v?.color ?? null,
       imageUrl: product?.image_url ?? null,
       isFreebie: Boolean(s.is_freebie),
-      marketEvent: s.market_event_id ? (eventName.get(s.market_event_id as string) ?? null) : null,
+      isConsignment: (s.payment_method as string) === "Consignation",
+      marketEvent: event?.name ?? null,
+      // A market says where it stood, Shopify is by definition online, and
+      // anything else falls back to who it was sold to.
+      location:
+        event?.venue ??
+        event?.name ??
+        (s.channel === "shopify" ? "Online" : null) ??
+        ((s.customer_ref as string) || null),
       shopifyOrderId: (s.shopify_order_id as string) ?? null,
+      shopifyOrderNumber: orderNumber,
+      shopifyAdminUrl:
+        shopDomain && orderNumber
+          ? `https://${shopDomain}/admin/orders/${orderNumber}`
+          : null,
       notionSynced: Boolean(s.notion_page_id),
       notionError: (s.notion_error as string) ?? null,
     };
