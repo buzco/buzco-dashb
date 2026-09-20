@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { shopifyCdnResize } from "@/lib/shopify/image";
 import type { SaleOrderView } from "@/lib/sales/data";
+import type { PaymentGroup } from "@/lib/sales/payment-owner";
 import { SettleForm, RetryNotionButton, ReturnLineButton, SoldToggle } from "./order-actions";
 
 // One order, collapsed to a single line until you want the detail.
@@ -11,11 +12,11 @@ import { SettleForm, RetryNotionButton, ReturnLineButton, SoldToggle } from "./o
 
 export function OrderBlock({
   order,
-  paymentOptions = [],
+  paymentGroups = [],
 }: {
   order: SaleOrderView;
   /** Only passed on the consignations tab, where settling happens. */
-  paymentOptions?: string[];
+  paymentGroups?: PaymentGroup[];
 }) {
   const isConsignment = order.kind === "consignment";
   const pending = order.paymentStatus === "pending";
@@ -162,9 +163,9 @@ export function OrderBlock({
           )}
         </div>
 
-        {isConsignment && pending && paymentOptions.length > 0 && (
+        {isConsignment && pending && paymentGroups.length > 0 && (
           <div className="border-t border-line pt-3">
-            <SettleForm orderId={order.id} paymentOptions={paymentOptions} />
+            <SettleForm orderId={order.id} paymentGroups={paymentGroups} />
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ import {
   setLineSold,
   type SaleOrderState,
 } from "@/lib/actions/sales";
+import type { PaymentGroup } from "@/lib/sales/payment-owner";
 
 /**
  * Declaring a consignation paid.
@@ -19,10 +20,10 @@ import {
  */
 export function SettleForm({
   orderId,
-  paymentOptions,
+  paymentGroups,
 }: {
   orderId: string;
-  paymentOptions: string[];
+  paymentGroups: PaymentGroup[];
 }) {
   const [state, formAction, isPending] = useActionState<SaleOrderState | undefined, FormData>(
     settleOrder.bind(null, orderId),
@@ -42,11 +43,25 @@ export function SettleForm({
           <option value="" disabled>
             Payment method…
           </option>
-          {paymentOptions.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
+          {/* Grouped by whose account it lands in — the same split the till
+              shows, so the two menus read the same way. */}
+          {paymentGroups.map((group) =>
+            group.owner ? (
+              <optgroup key={group.owner} label={group.owner}>
+                {group.options.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </optgroup>
+            ) : (
+              group.options.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))
+            ),
+          )}
         </select>
         <button
           type="submit"

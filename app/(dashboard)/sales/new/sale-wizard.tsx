@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/sales";
 import type { SaleProductView, SaleVariantView } from "@/lib/sales/catalog";
 import { priceFor, repriceCart, type PriceList } from "@/lib/sales/pricing";
+import type { PaymentGroup } from "@/lib/sales/payment-owner";
 
 // The till. Built for a phone held in one hand at a market or in a shop's back
 // room: pictures rather than SKUs, one question per screen, and nothing that
@@ -56,7 +57,7 @@ export function SaleWizard({
   customers,
   priceLists,
   whereOptions,
-  paymentOptions,
+  paymentGroups,
   optionsAreLive,
   notionConfigured,
   shopifyConfigured,
@@ -66,7 +67,8 @@ export function SaleWizard({
   /** Each shop's agreed prices, keyed by retailer id. */
   priceLists: Record<string, PriceList>;
   whereOptions: string[];
-  paymentOptions: string[];
+  /** Payment methods split by whose account the money lands in. */
+  paymentGroups: PaymentGroup[];
   optionsAreLive: boolean;
   notionConfigured: boolean;
   shopifyConfigured: boolean;
@@ -279,7 +281,7 @@ export function SaleWizard({
           onStatus={setPaymentStatus}
           method={paymentMethod}
           onMethod={setPaymentMethod}
-          options={paymentOptions}
+          groups={paymentGroups}
           optionsAreLive={optionsAreLive}
         />
       )}
@@ -708,7 +710,7 @@ function PaymentStep({
   onStatus,
   method,
   onMethod,
-  options,
+  groups,
   optionsAreLive,
 }: {
   isConsignment: boolean;
@@ -716,7 +718,7 @@ function PaymentStep({
   onStatus: (s: "paid" | "pending") => void;
   method: string;
   onMethod: (m: string) => void;
-  options: string[];
+  groups: PaymentGroup[];
   optionsAreLive: boolean;
 }) {
   if (isConsignment) {
@@ -758,7 +760,19 @@ function PaymentStep({
           title="Paid with what?"
           hint={optionsAreLive ? "Live from Notion" : "Notion unreachable — showing the last known list"}
         >
-          <ChipGrid options={options} value={method} onChange={onMethod} />
+          {/* One block per person, because every method exists once per
+              person — picking "Cash" then "André" is two decisions flattened
+              into sixteen buttons otherwise. Shared methods lead. */}
+          <div className="space-y-4">
+            {groups.map((group) => (
+              <div key={group.owner ?? "shared"} className="space-y-2">
+                {group.owner && (
+                  <p className="label-caps text-ink/40">{group.owner}</p>
+                )}
+                <ChipGrid options={group.options} value={method} onChange={onMethod} />
+              </div>
+            ))}
+          </div>
         </Question>
       )}
     </div>

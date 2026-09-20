@@ -12,6 +12,7 @@ import {
   type SortRule,
 } from "@/lib/sales/table-view";
 import { COLUMNS, COLUMN_BY_KEY, SUMMED_COLUMNS } from "./loose-sales-columns";
+import { ownerOf } from "@/lib/sales/payment-owner";
 
 // Everything recorded outside an order: market tills, Shopify imports, raffle
 // rows, and anything logged before orders existed. Over a hundred rows and
@@ -233,7 +234,11 @@ export function LooseSales({ rows }: { rows: LooseSaleView[] }) {
                     <Select
                       value={rule.value}
                       onChange={(v) => patchFilter(rule.id, { value: v })}
-                      options={[["", "Pick one…"], ...(selectOptions.get(column.key) ?? []).map((o) => [o, o] as [string, string])]}
+                      options={[
+                        ["", "Pick one…"],
+                        ...(selectOptions.get(column.key) ?? []).map((o) => [o, o] as [string, string]),
+                      ]}
+                      groupBy={column.key === "payment" ? ownerOf : undefined}
                     />
                   ) : (
                     <input
@@ -501,22 +506,45 @@ function Select({
   value,
   onChange,
   options,
+  groupBy,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: Array<[string, string]>;
+  /** Puts each option under a heading — used to split payments by person. */
+  groupBy?: (value: string) => string | null;
 }) {
+  const groups: Array<[string | null, Array<[string, string]>]> = [];
+  for (const option of options) {
+    const heading = groupBy && option[0] ? groupBy(option[0]) : null;
+    const existing = groups.find(([h]) => h === heading);
+    if (existing) existing[1].push(option);
+    else groups.push([heading, [option]]);
+  }
+
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-bone outline-none focus:border-ink"
     >
-      {options.map(([v, label]) => (
-        <option key={v} value={v}>
-          {label}
-        </option>
-      ))}
+      {groups.map(([heading, groupOptions]) =>
+        heading ? (
+          <optgroup key={heading} label={heading}>
+            {groupOptions.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </optgroup>
+        ) : (
+          groupOptions.map(([v, label]) => (
+            <option key={v} value={v}>
+              {label}
+            </option>
+          ))
+        ),
+      )}
     </select>
   );
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { loadSaleOrders } from "@/lib/sales/data";
-import { getSalesOptions, payableOptions } from "@/lib/notion/options";
+import { getSalesOptions, payableOptions, groupPaymentOptions } from "@/lib/notion/options";
 import { OrderBlock } from "../order-block";
 
 // Consignations kept apart from sales because they are a different kind of
@@ -47,7 +47,7 @@ export default async function ConsignmentsSubTabPage() {
         ) : (
           <div className="space-y-2">
             {open.map((order) => (
-              <OrderBlock key={order.id} order={order} paymentOptions={payableOptions(options.payment)} />
+              <OrderBlock key={order.id} order={order} paymentGroups={groupPaymentOptions(payableOptions(options.payment))} />
             ))}
           </div>
         )}

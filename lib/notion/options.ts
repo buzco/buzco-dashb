@@ -3,6 +3,16 @@ import "server-only";
 import { getDatabase, salesDbId, type NotionDatabase } from "@/lib/notion/client";
 import { findProp } from "@/lib/notion/props";
 
+// Grouping payments by person is pure string work the client needs too, so it
+// lives outside this `server-only` module and is re-exported for the callers
+// that already import their option helpers from here.
+export {
+  ownerOf,
+  groupPaymentOptions,
+  PAYMENT_OWNERS,
+  type PaymentGroup,
+} from "@/lib/sales/payment-owner";
+
 // The sales logger's dropdowns are the Notion tracker's own option lists.
 //
 // This is not cosmetic. Every option the app offers gets written straight into
